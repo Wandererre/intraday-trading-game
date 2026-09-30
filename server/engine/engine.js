@@ -202,11 +202,26 @@ export class TradingEngine {
       const prevTotal = (player.roundBalances || []).reduce((a, b) => a + b, 0);
       const totalScore = prevTotal + equity;
 
+      // Cumulative delta from completed previous rounds (does not reset round to round)
+      let prevRoundsDelta = 0;
+      if (player.roundBalances) {
+        for (let r = 0; r < this.roundIndex; r++) {
+          if (player.roundBalances[r] !== undefined) {
+            prevRoundsDelta += (player.roundBalances[r] - this.startingBalance);
+          }
+        }
+      }
+      const currentRoundDelta = equity - this.startingBalance;
+      const cumulativeDelta = prevRoundsDelta + currentRoundDelta;
+      const cumulativeEquity = this.startingBalance + cumulativeDelta;
+
       player.equityHistory.push({
         roundIndex: this.roundIndex,
         tickIndex: this.currentTick,
         gameTimeSec: this.gameTimeSec,
-        equity: Math.round(equity * 100) / 100,
+        equity: Math.round(cumulativeEquity * 100) / 100,
+        roundEquity: Math.round(equity * 100) / 100,
+        cumulativeDelta: Math.round(cumulativeDelta * 100) / 100,
         balance: Math.round(player.balance * 100) / 100,
         bankDebt: Math.round((player.bankDebt || 0) * 100) / 100,
         totalScore: Math.round(totalScore * 100) / 100,
@@ -897,9 +912,7 @@ export class TradingEngine {
   }
 
   endRound() {
-    this.recordEquitySnapshot('round_end');
-
-    // Close all open positions at final price
+    // Close all open positions at final price and settle bank debt
     for (const player of this.players.values()) {
       if (player.positions && player.positions.length > 0) {
         this.closeAllPositions(player.id, 'round_end');
@@ -908,6 +921,11 @@ export class TradingEngine {
         player.balance = Math.max(0, player.balance - player.bankDebt);
         player.bankDebt = 0;
       }
+    }
+
+    this.recordEquitySnapshot('round_end');
+
+    for (const player of this.players.values()) {
       player.roundBalances = player.roundBalances || [];
       player.roundBalances.push(player.balance);
     }

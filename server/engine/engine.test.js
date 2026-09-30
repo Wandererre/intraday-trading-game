@@ -269,3 +269,47 @@ test('Trading Engine: Take Profit and Stop Loss auto-execution', () => {
   assert.ok(engine.players.get('p_sl').balance < 10000, 'P2 took limited loss from SL');
 });
 
+test('Trading Engine: Continuous delta and equity across rounds without reset', () => {
+  const p = createInitialPlayer('p_cont', 'ContTrader', 10000);
+  const engine = new TradingEngine({ startingBalance: 10000 });
+  engine.addPlayer(p);
+
+  // Round 0
+  const candlesR0 = [
+    { open: 100, high: 100, low: 100, close: 100, volume: 1 },
+    { open: 100, high: 120, low: 100, close: 120, volume: 1 }
+  ];
+  engine.initRound(0, candlesR0, 2);
+  engine.stepTick([{ playerId: 'p_cont', type: ORDER_TYPES.MARKET_BUY, sizePct: 50, leverage: 1, amount: 5000 }]);
+  engine.stepTick([{ playerId: 'p_cont', type: ORDER_TYPES.CLOSE }]);
+  engine.endRound();
+
+  const finalBalanceR0 = engine.players.get('p_cont').roundBalances[0];
+  const deltaR0 = finalBalanceR0 - 10000;
+  assert.ok(deltaR0 > 900, 'Round 0 should have profit around 1000');
+
+  // Round 1 begins
+  const candlesR1 = [
+    { open: 100, high: 100, low: 100, close: 100, volume: 1 },
+    { open: 100, high: 110, low: 100, close: 110, volume: 1 }
+  ];
+  engine.initRound(1, candlesR1, 2);
+  const r1StartSnap = engine.players.get('p_cont').equityHistory.find(s => s.roundIndex === 1 && s.event === 'round_start');
+  assert.ok(r1StartSnap, 'Round 1 start snapshot should exist');
+  assert.equal(r1StartSnap.equity, finalBalanceR0, 'Round 1 starting equity must match Round 0 ending balance without reset');
+  assert.equal(r1StartSnap.cumulativeDelta, Math.round(deltaR0 * 100) / 100, 'Round 1 starting delta must continue from Round 0 delta');
+
+  // Round 1 trade
+  engine.stepTick([{ playerId: 'p_cont', type: ORDER_TYPES.MARKET_BUY, sizePct: 50, leverage: 1, amount: 5000 }]);
+  engine.stepTick([{ playerId: 'p_cont', type: ORDER_TYPES.CLOSE }]);
+  engine.endRound();
+
+  const finalBalanceR1 = engine.players.get('p_cont').roundBalances[1];
+  const deltaR1 = finalBalanceR1 - 10000;
+  const expectedTotalDelta = deltaR0 + deltaR1;
+
+  const r1EndSnap = engine.players.get('p_cont').equityHistory.find(s => s.roundIndex === 1 && s.event === 'round_end');
+  assert.equal(r1EndSnap.cumulativeDelta, Math.round(expectedTotalDelta * 100) / 100, 'Round 1 final delta must be cumulative of R0 + R1');
+  assert.equal(r1EndSnap.equity, Math.round((10000 + expectedTotalDelta) * 100) / 100, 'Round 1 ending equity must continue cumulatively');
+});
+

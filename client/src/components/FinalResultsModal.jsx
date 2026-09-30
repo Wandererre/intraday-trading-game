@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 
 const PLAYER_COLORS = [
@@ -44,6 +44,75 @@ export default function FinalResultsModal({
       stats
     }))
     .sort((a, b) => b.balance - a.balance);
+
+  // Continuous cumulative equity trajectories across all rounds:
+  // Instead of resetting delta to $0 at the start of each round,
+  // each round's trajectory continues from the closing delta of the previous round.
+  const continuousHistories = useMemo(() => {
+    const result = {};
+
+    for (const [nickname, rawHistory] of Object.entries(allHistories)) {
+      if (!rawHistory || rawHistory.length === 0) {
+        result[nickname] = [];
+        continue;
+      }
+
+      // Check if history already has server-side continuous cumulativeDelta
+      const hasCumulativeDelta = rawHistory.some(pt => pt.cumulativeDelta !== undefined);
+      if (hasCumulativeDelta) {
+        result[nickname] = rawHistory.map(pt => ({
+          ...pt,
+          equity: pt.cumulativeDelta !== undefined ? 10000 + pt.cumulativeDelta : pt.equity
+        }));
+        continue;
+      }
+
+      // Compute round cumulative offsets
+      // roundEndDeltas[r] stores the ending delta of round r
+      const roundEndDeltas = {};
+      for (const pt of rawHistory) {
+        const r = pt.roundIndex ?? 0;
+        const ptDelta = (pt.roundEquity !== undefined ? pt.roundEquity : pt.equity) - 10000;
+        roundEndDeltas[r] = ptDelta;
+      }
+
+      // Fallback or override with official roundBalances if available
+      const playerRanking = rankings.find(r => r.nickname === nickname);
+      if (playerRanking && playerRanking.roundBalances && playerRanking.roundBalances.length > 0) {
+        playerRanking.roundBalances.forEach((bal, r) => {
+          roundEndDeltas[r] = bal - 10000;
+        });
+      }
+
+      // Cumulative offset for round r = sum of ending deltas for all rounds < r
+      const roundOffsets = {};
+      let runningDelta = 0;
+      const sortedRounds = Object.keys(roundEndDeltas).map(Number).sort((a, b) => a - b);
+      for (const r of sortedRounds) {
+        roundOffsets[r] = runningDelta;
+        runningDelta += (roundEndDeltas[r] || 0);
+      }
+
+      // Map each point to continuous cumulative equity
+      const mapped = rawHistory.map(pt => {
+        const r = pt.roundIndex ?? 0;
+        const offset = roundOffsets[r] || 0;
+        const roundDelta = (pt.roundEquity !== undefined ? pt.roundEquity : pt.equity) - 10000;
+        const continuousEquity = 10000 + offset + roundDelta;
+
+        return {
+          ...pt,
+          equity: continuousEquity,
+          roundEquity: pt.roundEquity ?? pt.equity,
+          cumulativeDelta: offset + roundDelta
+        };
+      });
+
+      result[nickname] = mapped;
+    }
+
+    return result;
+  }, [allHistories, rankings]);
 
   const winner = rankings[0];
 
@@ -185,7 +254,7 @@ export default function FinalResultsModal({
   let rawMax = -Infinity;
   let maxGameTime = 0;
 
-  for (const [nickname, history] of Object.entries(allHistories)) {
+  for (const [nickname, history] of Object.entries(continuousHistories)) {
     for (const pt of history) {
       if (typeof pt.equity === 'number' && !isNaN(pt.equity)) {
         if (pt.equity < rawMin) rawMin = pt.equity;
@@ -370,7 +439,7 @@ export default function FinalResultsModal({
 
     const currentTimeLimit = maxGameTime * animProgress;
 
-    for (const [nickname, history] of Object.entries(allHistories)) {
+    for (const [nickname, history] of Object.entries(continuousHistories)) {
       if (!history || history.length === 0) continue;
 
       const isSelected = selectedTrader === 'all' || selectedTrader === nickname;
@@ -458,7 +527,7 @@ export default function FinalResultsModal({
     }
 
     ctx.restore();
-  }, [animProgress, isCompleted, hoverData, selectedTrader]);
+  }, [animProgress, isCompleted, hoverData, selectedTrader, continuousHistories]);
 
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
@@ -477,7 +546,7 @@ export default function FinalResultsModal({
       const timeSec = Math.round(ratio * maxGameTime);
 
       const values = {};
-      for (const [nick, history] of Object.entries(allHistories)) {
+      for (const [nick, history] of Object.entries(continuousHistories)) {
         let closest = history[0];
         for (const pt of history) {
           if (pt.gameTimeSec <= timeSec) {
