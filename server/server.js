@@ -9,6 +9,7 @@ import { GameManager } from './game.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '../dist');
+const PUBLIC_DIR = path.resolve(__dirname, '../client/public');
 
 const PORT = process.env.PORT || 3000;
 
@@ -20,6 +21,14 @@ const MIME_TYPES = {
   '.json': 'application/json',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.ogg': 'video/ogg',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon'
 };
@@ -36,6 +45,14 @@ const server = http.createServer((req, res) => {
   }
 
   let filePath = path.join(DIST_DIR, req.url === '/' ? 'index.html' : req.url);
+
+  // If not found in dist, check client/public directly so meme files work immediately
+  if (!fs.existsSync(filePath)) {
+    const publicPath = path.join(PUBLIC_DIR, req.url);
+    if (fs.existsSync(publicPath) && !fs.statSync(publicPath).isDirectory()) {
+      filePath = publicPath;
+    }
+  }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     filePath = path.join(DIST_DIR, 'index.html');

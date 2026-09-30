@@ -29,6 +29,11 @@ export default function FinalResultsModal({
   const [hoverData, setHoverData] = useState(null);
   const [selectedTrader, setSelectedTrader] = useState('all');
 
+  const [stage, setStage] = useState('SUSPENSE'); // 'SUSPENSE' | 'MEME_SHOW' | 'FULL_RESULTS'
+  const [currentAwardIndex, setCurrentAwardIndex] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const videoRef = useRef(null);
+
   // Determine rankings by total cumulative score
   const rankings = Object.entries(allStats)
     .map(([nickname, stats]) => ({
@@ -46,6 +51,135 @@ export default function FinalResultsModal({
   rankings.forEach((r, idx) => {
     colorMap[r.nickname] = PLAYER_COLORS[idx % PLAYER_COLORS.length];
   });
+
+  // Prepare Meme Awards list
+  const awards = [];
+
+  // 1. Top Profit (Winner)
+  if (rankings.length > 0) {
+    const winnerPlayer = rankings[0];
+    awards.push({
+      id: 'top_profit',
+      category: 'Winner',
+      leftLabel: 'Winner:',
+      name: winnerPlayer.nickname,
+      rightLabel: 'Total net worth:',
+      value: `$${Math.round(winnerPlayer.balance).toLocaleString()}`,
+      videoSrc: '/memes/top_profit.mp4',
+      badgeColor: '#f59e0b',
+      badgeBg: 'rgba(245, 158, 11, 0.14)'
+    });
+  }
+
+  // 2. Last standing (Loser)
+  if (rankings.length > 1) {
+    const loserPlayer = rankings[rankings.length - 1];
+    awards.push({
+      id: 'last_standing',
+      category: 'Loser',
+      leftLabel: 'Loser:',
+      name: loserPlayer.nickname,
+      rightLabel: 'Total net worth:',
+      value: `$${Math.round(loserPlayer.balance).toLocaleString()}`,
+      videoSrc: '/memes/last_standing.mp4',
+      badgeColor: '#94a3b8',
+      badgeBg: 'rgba(148, 163, 184, 0.14)'
+    });
+  }
+
+  // 3. Best Trade (Lucky Guy)
+  let maxTradePlayer = null;
+  let highestTradeProfit = 0;
+  for (const r of rankings) {
+    const profit = r.stats?.bestTradePnL || 0;
+    if (profit > highestTradeProfit) {
+      highestTradeProfit = profit;
+      maxTradePlayer = r;
+    }
+  }
+  if (maxTradePlayer && highestTradeProfit > 0) {
+    awards.push({
+      id: 'best_trade',
+      category: 'Lucky guy',
+      leftLabel: 'Lucky guy:',
+      name: maxTradePlayer.nickname,
+      rightLabel: 'Life changing trade:',
+      value: `+$${Math.round(highestTradeProfit).toLocaleString()}`,
+      videoSrc: '/memes/best_trade.mp4',
+      badgeColor: '#10b981',
+      badgeBg: 'rgba(16, 185, 129, 0.14)'
+    });
+  }
+
+  // 4. Highest Loss (Unlucky Guy) - only if someone actually had a negative trade!
+  let worstTradePlayer = null;
+  let biggestLossAmount = 0;
+  for (const r of rankings) {
+    const worst = r.stats?.worstTradePnL || 0;
+    if (worst < biggestLossAmount) {
+      biggestLossAmount = worst;
+      worstTradePlayer = r;
+    }
+  }
+  if (worstTradePlayer && biggestLossAmount < 0) {
+    awards.push({
+      id: 'biggest_loss',
+      category: 'Unlucky guy',
+      leftLabel: 'Unlucky guy:',
+      name: worstTradePlayer.nickname,
+      rightLabel: 'Loss made in single trade:',
+      value: `-$${Math.round(Math.abs(biggestLossAmount)).toLocaleString()}`,
+      videoSrc: '/memes/biggest_loss.mp4',
+      badgeColor: '#ef4444',
+      badgeBg: 'rgba(239, 68, 68, 0.14)'
+    });
+  }
+
+  const currentAward = awards[currentAwardIndex] || awards[0];
+
+  // 1.6s initial suspense gap before the Meme Show begins
+  useEffect(() => {
+    if (awards.length === 0) {
+      setStage('FULL_RESULTS');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setStage('MEME_SHOW');
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Auto-play / audio handling when switching awards
+  useEffect(() => {
+    if (stage === 'MEME_SHOW' && videoRef.current) {
+      videoRef.current.currentTime = 0;
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          setIsMuted(true);
+          videoRef.current?.play().catch(() => {});
+        });
+      }
+    }
+  }, [stage, currentAwardIndex]);
+
+  const handleNextAward = () => {
+    if (currentAwardIndex < awards.length - 1) {
+      setCurrentAwardIndex(prev => prev + 1);
+    } else {
+      setStage('FULL_RESULTS');
+    }
+  };
+
+  const handleVideoEnded = () => {
+    setTimeout(() => {
+      if (currentAwardIndex < awards.length - 1) {
+        setCurrentAwardIndex(prev => prev + 1);
+      } else {
+        setStage('FULL_RESULTS');
+      }
+    }, 1200);
+  };
 
   let rawMin = Infinity;
   let rawMax = -Infinity;
@@ -96,6 +230,7 @@ export default function FinalResultsModal({
   };
 
   useEffect(() => {
+    if (stage !== 'FULL_RESULTS') return;
     let startTime = null;
     const durationMs = 10000;
 
@@ -117,7 +252,7 @@ export default function FinalResultsModal({
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, []);
+  }, [stage]);
 
   const triggerConfetti = () => {
     try {
@@ -390,61 +525,315 @@ export default function FinalResultsModal({
       flexDirection: 'column',
       alignItems: 'center'
     }}>
-      <div style={{ maxWidth: '1060px', width: '100%' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)', fontWeight: 700 }}>
-              FINAL TOURNAMENT RESULTS
-            </span>
-            <h1 style={{ fontSize: '24px', fontWeight: 600, letterSpacing: '-0.02em', marginTop: '2px' }}>
-              Championship Standings
-            </h1>
-          </div>
+      {stage !== 'FULL_RESULTS' && (
+        <div style={{
+          maxWidth: '680px',
+          width: '100%',
+          backgroundColor: 'var(--bg-surface)',
+          border: '1px solid var(--border-hairline)',
+          borderRadius: '16px',
+          padding: '24px',
+          boxShadow: '0 20px 48px rgba(0, 0, 0, 0.18)',
+          display: 'flex',
+          flexDirection: 'column',
+          margin: 'auto 0'
+        }}>
+          {stage === 'SUSPENSE' ? (
+            <div style={{
+              minHeight: '360px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '40px 20px'
+            }}>
+              <span style={{
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.14em',
+                color: 'var(--accent)',
+                fontWeight: 800,
+                marginBottom: '10px'
+              }}>
+                MATCH CONCLUDED
+              </span>
+              <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 10px 0', color: 'var(--text-primary)' }}>
+                Calculating Tournament Awards...
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                The Meme Show is starting in a moment
+              </p>
+              <div style={{
+                width: '60px',
+                height: '3px',
+                backgroundColor: 'var(--accent)',
+                borderRadius: '2px',
+                marginTop: '20px',
+                opacity: 0.8
+              }} />
+            </div>
+          ) : (
+            <div>
+              {/* Top header navigation & category */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '14px',
+                paddingBottom: '12px',
+                borderBottom: '1px solid var(--border-hairline)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    fontWeight: 800,
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: currentAward.badgeBg,
+                    color: currentAward.badgeColor
+                  }}>
+                    Award {currentAwardIndex + 1} of {awards.length}
+                  </span>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {currentAward.category}
+                  </span>
+                </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {!isCompleted && (
-              <button
-                onClick={handleSkip}
-                className="btn-base btn-outline"
-                style={{ fontSize: '12px' }}
-              >
-                Skip Animation
-              </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setStage('FULL_RESULTS')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Skip to Full Results →
+                </button>
+              </div>
 
-            {isHost && onRestartGame && (
-              <button
-                onClick={onRestartGame}
-                className="btn-base"
-                style={{
-                  fontSize: '12px',
-                  backgroundColor: 'var(--color-long-bg)',
-                  border: '1px solid var(--color-long-border)',
-                  color: 'var(--color-long)',
-                  fontWeight: 600
-                }}
-              >
-                Restart Game (Keep Everyone Connected)
-              </button>
-            )}
+              {/* Video Clip Container */}
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                backgroundColor: '#000000',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                border: '1px solid var(--border-hairline)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+                minHeight: '260px'
+              }}>
+                <video
+                  ref={videoRef}
+                  key={currentAward.videoSrc}
+                  src={currentAward.videoSrc}
+                  autoPlay
+                  playsInline
+                  muted={isMuted}
+                  onEnded={handleVideoEnded}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '400px',
+                    objectFit: 'contain',
+                    display: 'block'
+                  }}
+                />
 
-            {onLeaveRoom && (
-              <button
-                onClick={onLeaveRoom}
-                className="btn-base"
-                style={{
-                  fontSize: '12px',
-                  backgroundColor: 'var(--bg-page)',
-                  border: '1px solid var(--border-hairline)',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 600
-                }}
-                title="Leave room and return to home screen"
-              >
-                ← Exit to Home
-              </button>
-            )}
+                {/* Audio Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsMuted(prev => !prev)}
+                  style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    right: '10px',
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+                    color: '#ffffff',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(4px)'
+                  }}
+                >
+                  {isMuted ? 'Sound: OFF (Click to Unmute)' : 'Sound: ON'}
+                </button>
+              </div>
+
+              {/* Format Below Video (Exact user requested layout) */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 18px',
+                backgroundColor: 'var(--bg-page)',
+                border: '1px solid var(--border-hairline)',
+                borderRadius: '8px',
+                marginTop: '14px',
+                marginBottom: '16px',
+                fontSize: '15px'
+              }}>
+                <div style={{ fontWeight: 700 }}>
+                  <span style={{ color: currentAward.badgeColor, marginRight: '8px' }}>{currentAward.leftLabel}</span>
+                  <span style={{ color: 'var(--text-primary)' }}>{currentAward.name}</span>
+                </div>
+                <div style={{ fontWeight: 700 }}>
+                  <span style={{ color: 'var(--text-secondary)', marginRight: '8px' }}>{currentAward.rightLabel}</span>
+                  <span className="tabular-nums" style={{ color: currentAward.badgeColor }}>{currentAward.value}</span>
+                </div>
+              </div>
+
+              {/* Award Selector Pills */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
+                {awards.map((a, idx) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => setCurrentAwardIndex(idx)}
+                    style={{
+                      padding: '5px 14px',
+                      fontSize: '11px',
+                      fontWeight: currentAwardIndex === idx ? 700 : 500,
+                      borderRadius: '20px',
+                      backgroundColor: currentAwardIndex === idx ? a.badgeBg : 'var(--bg-page)',
+                      color: currentAwardIndex === idx ? a.badgeColor : 'var(--text-secondary)',
+                      border: `1px solid ${currentAwardIndex === idx ? a.badgeColor : 'var(--border-hairline)'}`,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {idx + 1}. {a.category}
+                  </button>
+                ))}
+              </div>
+
+              {/* Navigation Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleNextAward}
+                  className="btn-base"
+                  style={{
+                    flex: 1,
+                    maxWidth: '280px',
+                    padding: '10px 20px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    backgroundColor: 'var(--accent)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {currentAwardIndex < awards.length - 1 ? 'Next Award →' : 'View Full Summary →'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStage('FULL_RESULTS')}
+                  className="btn-base btn-outline"
+                  style={{
+                    padding: '10px 18px',
+                    fontSize: '13px',
+                    color: 'var(--text-secondary)'
+                  }}
+                >
+                  Skip to Full Results
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {stage === 'FULL_RESULTS' && (
+        <div style={{ maxWidth: '1060px', width: '100%' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div>
+              <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)', fontWeight: 700 }}>
+                FINAL TOURNAMENT RESULTS
+              </span>
+              <h1 style={{ fontSize: '24px', fontWeight: 600, letterSpacing: '-0.02em', marginTop: '2px' }}>
+                Championship Standings
+              </h1>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {awards.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStage('MEME_SHOW');
+                    setCurrentAwardIndex(0);
+                  }}
+                  className="btn-base"
+                  style={{
+                    fontSize: '12px',
+                    backgroundColor: 'var(--bg-page)',
+                    border: '1px solid var(--border-hairline)',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600
+                  }}
+                >
+                  Watch Meme Show
+                </button>
+              )}
+
+              {!isCompleted && (
+                <button
+                  onClick={handleSkip}
+                  className="btn-base btn-outline"
+                  style={{ fontSize: '12px' }}
+                >
+                  Skip Animation
+                </button>
+              )}
+
+              {isHost && onRestartGame && (
+                <button
+                  onClick={onRestartGame}
+                  className="btn-base"
+                  style={{
+                    fontSize: '12px',
+                    backgroundColor: 'var(--color-long-bg)',
+                    border: '1px solid var(--color-long-border)',
+                    color: 'var(--color-long)',
+                    fontWeight: 600
+                  }}
+                >
+                  Restart Game (Keep Everyone Connected)
+                </button>
+              )}
+
+              {onLeaveRoom && (
+                <button
+                  onClick={onLeaveRoom}
+                  className="btn-base"
+                  style={{
+                    fontSize: '12px',
+                    backgroundColor: 'var(--bg-page)',
+                    border: '1px solid var(--border-hairline)',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600
+                  }}
+                  title="Leave room and return to home screen"
+                >
+                  ← Exit to Home
+                </button>
+              )}
 
             <button
               onClick={handleExportPNG}
@@ -717,6 +1106,7 @@ export default function FinalResultsModal({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -9,3 +9,4 @@ yarn-error.log*
 .env.local
 .vscode
 .idea
+**/raw_backup
