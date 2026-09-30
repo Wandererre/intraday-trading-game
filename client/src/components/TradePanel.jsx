@@ -157,7 +157,7 @@ export default function TradePanel({
               transition: 'all 0.15s ease'
             }}
           >
-            ⚡ MARKET
+            MARKET
           </button>
           <button
             type="button"
@@ -179,7 +179,7 @@ export default function TradePanel({
               transition: 'all 0.15s ease'
             }}
           >
-            🎯 LIMIT
+            LIMIT
           </button>
         </div>
 
@@ -229,7 +229,7 @@ export default function TradePanel({
           fontSize: '12px'
         }}>
           <strong style={{ color: '#ef4444', display: 'block', fontSize: '13px', marginBottom: '4px' }}>
-            🚨 POSITIONS LIQUIDATED
+            POSITIONS LIQUIDATED
           </strong>
           <span style={{ color: '#94a3b8' }}>
             Fresh $10,000 cash balance will be granted for next round!
@@ -396,9 +396,9 @@ export default function TradePanel({
               {/* Helper trigger explanation */}
               <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '5px', lineHeight: 1.4 }}>
                 {isLong ? (
-                  <span>📉 <strong>Buy Long Limit:</strong> Will trigger & fill if price drops to or below <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
+                  <span><strong>Buy Long Limit:</strong> Will trigger & fill if price drops to or below <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
                 ) : (
-                  <span>📈 <strong>Buy Short Limit:</strong> Will trigger & fill if price rises to or above <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
+                  <span><strong>Buy Short Limit:</strong> Will trigger & fill if price rises to or above <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
                 )}
               </div>
             </div>
@@ -704,7 +704,7 @@ export default function TradePanel({
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.04em' }}>
-              🎯 OPEN LIMIT ORDERS ({openLimitOrders.length})
+              OPEN LIMIT ORDERS ({openLimitOrders.length})
             </span>
           </div>
 
@@ -798,7 +798,6 @@ export default function TradePanel({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>🏦</span>
             <span style={{ letterSpacing: '0.04em' }}>LOAN BANK (DEGENERATE LIQUIDITY)</span>
             {bankDebt > 0 && (
               <span style={{

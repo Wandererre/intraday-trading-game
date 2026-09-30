@@ -186,8 +186,7 @@ export default function CodingTerminalModal({
               }}
               title="Beginner Guide: How rules and indicators work in plain layman terms"
             >
-              <span style={{ fontSize: '12px' }}>📖</span>
-              <span>Manual (Beginners)</span>
+              <span style={{ fontWeight: 600 }}>Manual (Beginners)</span>
             </button>
           </div>
         </div>
@@ -324,7 +323,7 @@ export default function CodingTerminalModal({
           flexShrink: 0
         }}>
           <div>
-            🔒 <strong>RULES LOCKED DURING ACTIVE ROUND</strong> — Rules can only be edited between rounds. You can toggle <strong>Automation ON / OFF</strong> above to pause or resume trading at any time.
+            <strong>RULES LOCKED DURING ACTIVE ROUND</strong> - Rules can only be edited between rounds. You can toggle <strong>Automation ON / OFF</strong> above to pause or resume trading at any time.
           </div>
           <span style={{ fontSize: '11px', opacity: 0.85 }}>All rule trades are tagged with "BOT" in Trade Feed</span>
         </div>
@@ -341,7 +340,7 @@ export default function CodingTerminalModal({
           flexShrink: 0
         }}>
           <div>
-            ⚡ <strong>SETUP AUTOMATION (MAX 5 RULES)</strong> — Build simple automated trading rules below using dropdowns. Rules execute top-to-bottom every tick with a 10-tick anti-spam cooldown.
+            <strong>SETUP AUTOMATION (MAX 5 RULES)</strong> - Build simple automated trading rules below using dropdowns. Rules execute top-to-bottom every tick with a 10-tick anti-spam cooldown.
           </div>
           <span style={{ fontSize: '11px', opacity: 0.85 }}>Manual trading remains available while rules run</span>
         </div>

@@ -138,7 +138,7 @@ export default function Lobby({
                 transition: 'all 0.15s ease'
               }}
             >
-              ➕ CREATE ROOM
+              CREATE ROOM
             </button>
             <button
               type="button"
@@ -157,7 +157,7 @@ export default function Lobby({
                 transition: 'all 0.15s ease'
               }}
             >
-              🔗 JOIN ROOM
+              JOIN ROOM
             </button>
           </div>
 
@@ -532,7 +532,7 @@ export default function Lobby({
                       color: candleDurationSec === sec ? 'var(--accent)' : 'var(--text-secondary)'
                     }}
                   >
-                    {sec}s {sec === 15 ? '★' : ''}
+                    {sec}s
                   </button>
                 ))}
               </div>

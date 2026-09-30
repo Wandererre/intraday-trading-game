@@ -41,7 +41,6 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '22px' }}>📖</span>
             <div>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800, letterSpacing: '0.02em', color: '#ffffff' }}>
                 TRADING RULES & AUTOMATION MANUAL
@@ -101,7 +100,7 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
             padding: '16px'
           }}>
             <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 700, color: '#38bdf8' }}>
-              💡 What is Automation? (The Big Idea)
+              What is Automation? (The Big Idea)
             </h3>
             <p style={{ margin: 0, color: '#cbd5e1' }}>
               Think of rules like setting <strong>smart alarms</strong>. Instead of staring at the chart every second and clicking Buy or Sell manually, you create simple rules:
@@ -126,7 +125,7 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
           {/* Section 2: What Each Indicator Means */}
           <section>
             <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
-              📊 Market Indicators (What the dropdowns mean)
+              Market Indicators (What the dropdowns mean)
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '10px' }}>
               <div style={cardStyle}>
@@ -145,7 +144,7 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
               </div>
 
               <div style={cardStyle}>
-                <div style={titleStyle}><span style={{ color: '#ec4899' }}>rsi(14)</span>: Oversold / Overbought Meter (0–100)</div>
+                <div style={titleStyle}><span style={{ color: '#ec4899' }}>rsi(14)</span>: Oversold / Overbought Meter (0-100)</div>
                 <div style={descStyle}>
                   • <strong>Below 30</strong> = Heavily discounted / oversold. Great chance to buy the dip!<br/>
                   • <strong>Above 70</strong> = Overheated / overbought. Great time to take profit or exit!
@@ -181,25 +180,25 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
           {/* Section 3: Comparisons Explained */}
           <section>
             <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
-              ⚖️ Comparisons (How conditions trigger)
+              Comparisons (How conditions trigger)
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '10px' }}>
               <div style={cardStyle}>
-                <div style={titleStyle}>⚡ crosses above / crosses below</div>
+                <div style={titleStyle}>crosses above / crosses below</div>
                 <div style={descStyle}>
                   Fires <strong>only at the exact moment</strong> the line cuts across the target. For example, when price jumps from below sma(20) to above it. This prevents the rule from firing over and over.
                 </div>
               </div>
 
               <div style={cardStyle}>
-                <div style={titleStyle}>📈 is above / is below</div>
+                <div style={titleStyle}>is above / is below</div>
                 <div style={descStyle}>
                   Remains true as long as the value is higher or lower (e.g., <em>rsi is below 30</em> or <em>my PnL is above 10</em>).
                 </div>
               </div>
 
               <div style={cardStyle}>
-                <div style={titleStyle}>🎯 equals</div>
+                <div style={titleStyle}>equals</div>
                 <div style={descStyle}>
                   An exact match. Most commonly used for checking: <strong>my position equals none</strong>.
                 </div>
@@ -215,7 +214,7 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
             padding: '16px'
           }}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 700, color: '#eab308' }}>
-              ⭐ 4 Golden Rules for Beginners
+              4 Golden Rules for Beginners
             </h3>
             <ul style={{ margin: 0, paddingLeft: '20px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <li>
@@ -248,7 +247,7 @@ export default function BeginnerManualModal({ isOpen, onClose }) {
           {/* Section 5: Starter Templates */}
           <section>
             <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
-              🚀 One-Click Starter Templates (Top Bar)
+              One-Click Starter Templates (Top Bar)
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
               <div style={{ ...cardStyle, borderLeft: '3px solid #38bdf8' }}>
