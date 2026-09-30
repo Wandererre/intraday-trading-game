@@ -497,6 +497,28 @@ export default function App() {
     }
   };
 
+  const handleUpdatePositionTpSl = ({ positionId, stopLossPct, takeProfitPct }) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'UPDATE_POSITION_TP_SL',
+        positionId,
+        stopLossPct,
+        takeProfitPct
+      }));
+    }
+  };
+
+  const handleUpdateLimitOrderTpSl = ({ orderId, stopLossPct, takeProfitPct }) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'UPDATE_LIMIT_ORDER_TP_SL',
+        orderId,
+        stopLossPct,
+        takeProfitPct
+      }));
+    }
+  };
+
   const handleBankBorrow = (amount) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: 'BANK_BORROW', amount }));
@@ -585,8 +607,10 @@ export default function App() {
               gameState={game.state}
               currentUserId={myPlayerId}
               onClosePosition={handleClosePosition}
+              onUpdatePositionTpSl={handleUpdatePositionTpSl}
               limitOrders={myState?.limitOrders || []}
               onCancelLimitOrder={handleCancelLimitOrder}
+              onUpdateLimitOrderTpSl={handleUpdateLimitOrderTpSl}
               currentPrice={tickData.currentPrice}
             />
           </div>

@@ -546,6 +546,34 @@ export class TradingEngine {
     return closedEvents;
   }
 
+  updatePositionTpSl(playerId, positionId, stopLossPct = null, takeProfitPct = null) {
+    const player = this.players.get(playerId);
+    if (!player || !player.positions) return false;
+    const pos = player.positions.find(p => p.id === positionId);
+    if (!pos) return false;
+    pos.stopLossPct = (stopLossPct !== null && stopLossPct !== undefined && !isNaN(Number(stopLossPct)) && Number(stopLossPct) > 0)
+      ? Math.abs(Number(stopLossPct))
+      : null;
+    pos.takeProfitPct = (takeProfitPct !== null && takeProfitPct !== undefined && !isNaN(Number(takeProfitPct)) && Number(takeProfitPct) > 0)
+      ? Math.abs(Number(takeProfitPct))
+      : null;
+    return true;
+  }
+
+  updateLimitOrderTpSl(playerId, orderId, stopLossPct = null, takeProfitPct = null) {
+    const player = this.players.get(playerId);
+    if (!player || !player.limitOrders) return false;
+    const ord = player.limitOrders.find(o => o.id === orderId);
+    if (!ord) return false;
+    ord.stopLossPct = (stopLossPct !== null && stopLossPct !== undefined && !isNaN(Number(stopLossPct)) && Number(stopLossPct) > 0)
+      ? Math.abs(Number(stopLossPct))
+      : null;
+    ord.takeProfitPct = (takeProfitPct !== null && takeProfitPct !== undefined && !isNaN(Number(takeProfitPct)) && Number(takeProfitPct) > 0)
+      ? Math.abs(Number(takeProfitPct))
+      : null;
+    return true;
+  }
+
   liquidatePosition(player, posIndex, currentPrice) {
     const pos = player.positions[posIndex];
     if (!pos) return;

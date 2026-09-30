@@ -336,6 +336,30 @@ wss.on('connection', (ws) => {
           break;
         }
 
+        case 'UPDATE_POSITION_TP_SL': {
+          if (boundPlayerId && data.positionId) {
+            game.executeImmediateUpdatePositionTpSl(
+              boundPlayerId,
+              data.positionId,
+              data.stopLossPct,
+              data.takeProfitPct
+            );
+          }
+          break;
+        }
+
+        case 'UPDATE_LIMIT_ORDER_TP_SL': {
+          if (boundPlayerId && data.orderId) {
+            game.executeImmediateUpdateLimitOrderTpSl(
+              boundPlayerId,
+              data.orderId,
+              data.stopLossPct,
+              data.takeProfitPct
+            );
+          }
+          break;
+        }
+
         case 'BANK_BORROW': {
           if (boundPlayerId) {
             game.executeImmediateBankBorrow(boundPlayerId, data.amount);

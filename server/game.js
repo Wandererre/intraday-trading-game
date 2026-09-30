@@ -468,6 +468,22 @@ export class GameManager {
     return !!res;
   }
 
+  // Update Take Profit & Stop Loss on active position
+  executeImmediateUpdatePositionTpSl(playerId, positionId, stopLossPct, takeProfitPct) {
+    if (this.state !== GAME_STATES.ROUND_ACTIVE) return false;
+    const res = this.engine.updatePositionTpSl(playerId, positionId, stopLossPct, takeProfitPct);
+    this.broadcastState();
+    return !!res;
+  }
+
+  // Update Take Profit & Stop Loss on pending limit order
+  executeImmediateUpdateLimitOrderTpSl(playerId, orderId, stopLossPct, takeProfitPct) {
+    if (this.state !== GAME_STATES.ROUND_ACTIVE) return false;
+    const res = this.engine.updateLimitOrderTpSl(playerId, orderId, stopLossPct, takeProfitPct);
+    this.broadcastState();
+    return !!res;
+  }
+
   // Instant Bank loan borrow
   executeImmediateBankBorrow(playerId, amount) {
     if (this.state !== GAME_STATES.ROUND_ACTIVE) return false;

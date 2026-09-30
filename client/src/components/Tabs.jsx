@@ -9,8 +9,10 @@ export default function Tabs({
   gameState = 'LOBBY',
   currentUserId = null,
   onClosePosition,
+  onUpdatePositionTpSl,
   limitOrders = [],
   onCancelLimitOrder,
+  onUpdateLimitOrderTpSl,
   currentPrice = 0
 }) {
   const [activeTab, setActiveTab] = useState('positions');
@@ -56,8 +58,10 @@ export default function Tabs({
             leaderboard={leaderboard}
             currentUserId={currentUserId}
             onClosePosition={onClosePosition}
+            onUpdatePositionTpSl={onUpdatePositionTpSl}
             limitOrders={limitOrders}
             onCancelLimitOrder={onCancelLimitOrder}
+            onUpdateLimitOrderTpSl={onUpdateLimitOrderTpSl}
             currentPrice={currentPrice}
           />
         )}

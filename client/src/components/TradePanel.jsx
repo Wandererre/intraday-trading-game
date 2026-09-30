@@ -21,8 +21,6 @@ export default function TradePanel({
   const [side, setSide] = useState('LONG'); // 'LONG' | 'SHORT'
   const [amountStr, setAmountStr] = useState('250');
   const [limitPriceStr, setLimitPriceStr] = useState('');
-  const [takeProfitStr, setTakeProfitStr] = useState('');
-  const [stopLossStr, setStopLossStr] = useState('');
   const [leverage, setLeverage] = useState(5);
   const [showBankDetails, setShowBankDetails] = useState(false);
 
@@ -71,8 +69,6 @@ export default function TradePanel({
     if (disabled || isLiquidated || balance <= 5 || clampedAmount < 5) return;
 
     const sizePct = Math.min(100, Math.max(1, Math.round((clampedAmount / balance) * 100)));
-    const parsedTP = takeProfitStr ? Math.abs(parseFloat(takeProfitStr)) : null;
-    const parsedSL = stopLossStr ? Math.abs(parseFloat(stopLossStr)) : null;
 
     if (orderType === 'LIMIT') {
       const parsedLimitPrice = parseFloat(limitPriceStr);
@@ -83,9 +79,7 @@ export default function TradePanel({
           limitPrice: parsedLimitPrice,
           sizePct,
           leverage: lev,
-          amount: clampedAmount,
-          stopLossPct: parsedSL,
-          takeProfitPct: parsedTP
+          amount: clampedAmount
         });
       }
     } else {
@@ -94,9 +88,7 @@ export default function TradePanel({
           side,
           sizePct,
           leverage: lev,
-          amount: clampedAmount,
-          stopLossPct: parsedSL,
-          takeProfitPct: parsedTP
+          amount: clampedAmount
         });
       }
     }
@@ -113,7 +105,7 @@ export default function TradePanel({
       border: '1px solid var(--border-hairline)',
       borderRadius: 'var(--radius-md, 10px)',
       padding: '16px',
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
       display: 'flex',
       flexDirection: 'column',
       gap: '14px',
@@ -452,122 +444,6 @@ export default function TradePanel({
             </div>
           </div>
 
-          {/* Auto-Exit Targets: Take Profit (TP) & Stop Loss (SL) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '11px',
-                fontWeight: 700,
-                color: 'var(--text-secondary)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase'
-              }}>
-                Take Profit & Stop Loss (Optional)
-              </span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                {orderType === 'LIMIT' ? 'Attaches when limit order fills' : 'Auto-exits at target %'}
-              </span>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '10px'
-            }}>
-              {/* Take Profit */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--color-long)',
-                  marginBottom: '6px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em'
-                }}>
-                  Take Profit (%)
-                </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: 'var(--bg-page)',
-                  border: '1px solid var(--border-hairline)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '8px 10px'
-                }}>
-                  <input
-                    type="number"
-                    min="1"
-                    max="500"
-                    step="1"
-                    placeholder="e.g. 10"
-                    value={takeProfitStr}
-                    onChange={(e) => setTakeProfitStr(e.target.value)}
-                    className="tabular-nums"
-                    style={{
-                      flex: 1,
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      width: '100%'
-                    }}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--color-long)', fontWeight: 700 }}>%</span>
-                </div>
-              </div>
-
-              {/* Stop Loss */}
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--color-short)',
-                  marginBottom: '6px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em'
-                }}>
-                  Stop Loss (%)
-                </label>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: 'var(--bg-page)',
-                  border: '1px solid var(--border-hairline)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '8px 10px'
-                }}>
-                  <input
-                    type="number"
-                    min="1"
-                    max="95"
-                    step="1"
-                    placeholder="e.g. 5"
-                    value={stopLossStr}
-                    onChange={(e) => setStopLossStr(e.target.value)}
-                    className="tabular-nums"
-                    style={{
-                      flex: 1,
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      width: '100%'
-                    }}
-                  />
-                  <span style={{ fontSize: '11px', color: 'var(--color-short)', fontWeight: 700 }}>%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Order Details / Fill Receipt */}
           <div style={{
             backgroundColor: 'var(--bg-page)',
@@ -611,16 +487,6 @@ export default function TradePanel({
                 </span>
               </div>
             </div>
-
-            {(takeProfitStr || stopLossStr) && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid var(--border-hairline)' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Exit Orders</span>
-                <span style={{ fontSize: '10px', fontWeight: 600 }}>
-                  {takeProfitStr && <span style={{ color: 'var(--color-long)', marginRight: '6px' }}>TP: +{takeProfitStr}%</span>}
-                  {stopLossStr && <span style={{ color: 'var(--color-short)' }}>SL: -{stopLossStr}%</span>}
-                </span>
-              </div>
-            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid var(--border-hairline)' }}>
               <span style={{ color: 'var(--text-muted)' }}>Taker Fee (0.05%)</span>

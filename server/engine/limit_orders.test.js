@@ -136,3 +136,34 @@ test('Limit Orders: attaches TP and SL, preserves them in serialized state, and 
   assert.equal(aliceT3.positions.length, 0);
   assert.ok(aliceT3.balance > 10000, 'Balance should reflect profit after TP auto-close');
 });
+
+test('Positions & Limit Orders: updatePositionTpSl and updateLimitOrderTpSl dynamically', () => {
+  const engine = new TradingEngine({ startingBalance: 10000 });
+  const player = engine.addPlayer({ id: 'p_dyn', nickname: 'Dyno' });
+  engine.initRound(0, [{ open: 40000, high: 40500, low: 39500, close: 40000 }], 60);
+
+  // 1. Test updating pending limit order TP/SL
+  const ord = engine.placeLimitOrder('p_dyn', SIDES.LONG, 39000, 1000, null, 5);
+  assert.equal(ord.takeProfitPct, null);
+  assert.equal(ord.stopLossPct, null);
+
+  const ordUpdated = engine.updateLimitOrderTpSl('p_dyn', ord.id, 4, 12);
+  assert.equal(ordUpdated, true);
+  assert.equal(ord.stopLossPct, 4);
+  assert.equal(ord.takeProfitPct, 12);
+
+  // 2. Test updating active position TP/SL
+  const pos = engine.openPosition('p_dyn', SIDES.LONG, 20, 5, 'manual', 1000);
+  assert.equal(pos.takeProfitPct, null);
+  assert.equal(pos.stopLossPct, null);
+
+  const posUpdated = engine.updatePositionTpSl('p_dyn', pos.id, 6, 18);
+  assert.equal(posUpdated, true);
+  assert.equal(pos.stopLossPct, 6);
+  assert.equal(pos.takeProfitPct, 18);
+
+  // Can clear them
+  engine.updatePositionTpSl('p_dyn', pos.id, null, null);
+  assert.equal(pos.stopLossPct, null);
+  assert.equal(pos.takeProfitPct, null);
+});
