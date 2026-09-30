@@ -817,7 +817,9 @@ export class TradingEngine {
           margin: Math.round(pos.margin * 100) / 100,
           liquidationPrice: pos.liquidationPrice,
           pnl: Math.round(uPnL * 100) / 100,
-          pnlPct: Math.round((uPnL / pos.margin) * 1000) / 10
+          pnlPct: Math.round((uPnL / pos.margin) * 1000) / 10,
+          stopLossPct: pos.stopLossPct || null,
+          takeProfitPct: pos.takeProfitPct || null
         };
       });
 
@@ -830,7 +832,9 @@ export class TradingEngine {
         leverage: o.leverage,
         notional: Math.round(o.notional * 100) / 100,
         status: o.status,
-        createdAtTick: o.createdAtTick
+        createdAtTick: o.createdAtTick,
+        stopLossPct: o.stopLossPct || null,
+        takeProfitPct: o.takeProfitPct || null
       }));
 
       return {

@@ -99,3 +99,40 @@ test('Limit Orders: Buy Short limit order triggers when market price pumps to or
   assert.equal(pos.entryPrice, 42200);
   assert.equal(pos.leverage, 10);
 });
+
+test('Limit Orders: attaches TP and SL, preserves them in serialized state, and triggers auto-exit on fill', () => {
+  const engine = new TradingEngine({ startingBalance: 10000 });
+  const player = engine.addPlayer({ id: 'p1', nickname: 'Alice' });
+  const candles = [
+    { open: 40000, high: 40100, low: 39900, close: 40000 },
+    { open: 40000, high: 40050, low: 38800, close: 38900 }, // drops to 38800, triggers limit buy @ 39000
+    { open: 38900, high: 43000, low: 38800, close: 42000 }  // pumps to 42000 (+8% spot * 5x = +40% pnl, triggers TP 15%)
+  ];
+  engine.initRound(0, candles, 60);
+
+  // Place Limit Buy Long @ 39,000 with SL 5% and TP 15%
+  const order = engine.placeLimitOrder('p1', SIDES.LONG, 39000, 1000, null, 5, 5, 15);
+  assert.equal(order.stopLossPct, 5);
+  assert.equal(order.takeProfitPct, 15);
+
+  // Tick 1: order is still pending. Verify serialization in leaderboard
+  const tick1 = engine.stepTick();
+  const aliceT1 = tick1.leaderboard.find(p => p.id === 'p1');
+  assert.equal(aliceT1.limitOrders.length, 1);
+  assert.equal(aliceT1.limitOrders[0].stopLossPct, 5);
+  assert.equal(aliceT1.limitOrders[0].takeProfitPct, 15);
+
+  // Tick 2: order fills into position. Verify position retains TP & SL in engine & leaderboard
+  const tick2 = engine.stepTick();
+  const aliceT2 = tick2.leaderboard.find(p => p.id === 'p1');
+  assert.equal(aliceT2.limitOrders.length, 0);
+  assert.equal(aliceT2.positions.length, 1);
+  assert.equal(aliceT2.positions[0].stopLossPct, 5);
+  assert.equal(aliceT2.positions[0].takeProfitPct, 15);
+
+  // Tick 3: price pumps to 42000, hitting +15% TP -> position should be auto-closed with profit!
+  const tick3 = engine.stepTick();
+  const aliceT3 = tick3.leaderboard.find(p => p.id === 'p1');
+  assert.equal(aliceT3.positions.length, 0);
+  assert.ok(aliceT3.balance > 10000, 'Balance should reflect profit after TP auto-close');
+});

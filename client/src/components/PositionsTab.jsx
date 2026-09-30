@@ -138,6 +138,12 @@ export default function PositionsTab({
                           }}>
                             {ord.side} {ord.leverage}x
                           </span>
+                          {(ord.takeProfitPct || ord.stopLossPct) && (
+                            <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 600 }}>
+                              {ord.takeProfitPct && <span style={{ color: 'var(--color-long)', marginRight: '4px' }}>TP: +{ord.takeProfitPct}%</span>}
+                              {ord.stopLossPct && <span style={{ color: 'var(--color-short)' }}>SL: -{ord.stopLossPct}%</span>}
+                            </div>
+                          )}
                         </div>
 
                         <div className="tabular-nums" style={{ fontWeight: 600, color: '#f59e0b' }}>

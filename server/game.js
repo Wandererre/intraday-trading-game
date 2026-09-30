@@ -615,7 +615,9 @@ export class GameManager {
         margin: Math.round(p.margin * 100) / 100,
         liquidationPrice: p.liquidationPrice,
         unrealizedPnL: Math.round(this.engine.calculatePositionPnL(p, currentPrice) * 100) / 100,
-        pnlPct: Math.round((this.engine.calculatePositionPnL(p, currentPrice) / p.margin) * 1000) / 10
+        pnlPct: Math.round((this.engine.calculatePositionPnL(p, currentPrice) / p.margin) * 1000) / 10,
+        stopLossPct: p.stopLossPct || null,
+        takeProfitPct: p.takeProfitPct || null
       })),
       position: (enginePlayer.positions && enginePlayer.positions.length > 0) ? {
         side: enginePlayer.position.side,
@@ -625,7 +627,9 @@ export class GameManager {
         margin: Math.round(enginePlayer.position.margin * 100) / 100,
         liquidationPrice: enginePlayer.position.liquidationPrice,
         unrealizedPnL: Math.round(uPnL * 100) / 100,
-        pnlPct: Math.round((uPnL / enginePlayer.position.margin) * 1000) / 10
+        pnlPct: Math.round((uPnL / enginePlayer.position.margin) * 1000) / 10,
+        stopLossPct: enginePlayer.position.stopLossPct || null,
+        takeProfitPct: enginePlayer.position.takeProfitPct || null
       } : null,
       limitOrders: (enginePlayer.limitOrders || []).map(o => ({
         id: o.id,
@@ -636,7 +640,9 @@ export class GameManager {
         leverage: o.leverage,
         notional: Math.round(o.notional * 100) / 100,
         status: o.status,
-        createdAtTick: o.createdAtTick
+        createdAtTick: o.createdAtTick,
+        stopLossPct: o.stopLossPct || null,
+        takeProfitPct: o.takeProfitPct || null
       })),
       rules: enginePlayer.rules || [],
       strategy: playerRecord.strategy || null,
