@@ -1,0 +1,131 @@
+:root,
+:root[data-theme="dark"] {
+  --bg-page: #090b0e;
+  --bg-surface: #12151b;
+  --bg-surface-elevated: #181d25;
+  --bg-surface-hover: #1f2530;
+  --bg-surface-active: #272f3d;
+
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --border-focus: rgba(255, 255, 255, 0.28);
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-active: #1d4ed8;
+  --accent-subtle: rgba(59, 130, 246, 0.12);
+  --accent-text: #ffffff;
+
+  --color-long: #10b981;
+  --color-long-hover: #059669;
+  --color-long-bg: rgba(16, 185, 129, 0.12);
+  --color-long-border: rgba(16, 185, 129, 0.28);
+  --color-long-text: #34d399;
+
+  --color-short: #ef4444;
+  --color-short-hover: #dc2626;
+  --color-short-bg: rgba(239, 68, 68, 0.12);
+  --color-short-border: rgba(239, 68, 68, 0.28);
+  --color-short-text: #f87171;
+
+  --chart-bg: #12151b;
+  --chart-grid: rgba(255, 255, 255, 0.04);
+  --chart-text: #94a3b8;
+}
+
+:root[data-theme="light"] {
+  --bg-page: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f1f5f9;
+  --bg-surface-hover: #e2e8f0;
+  --bg-surface-active: #cbd5e1;
+
+  --border-hairline: rgba(0, 0, 0, 0.08);
+  --border-subtle: rgba(0, 0, 0, 0.14);
+  --border-focus: rgba(0, 0, 0, 0.3);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-active: #1e40af;
+  --accent-subtle: rgba(37, 99, 235, 0.08);
+  --accent-text: #ffffff;
+
+  --color-long: #059669;
+  --color-long-hover: #047857;
+  --color-long-bg: rgba(5, 150, 105, 0.1);
+  --color-long-border: rgba(5, 150, 105, 0.25);
+  --color-long-text: #059669;
+
+  --color-short: #dc2626;
+  --color-short-hover: #b91c1c;
+  --color-short-bg: rgba(220, 38, 38, 0.1);
+  --color-short-border: rgba(220, 38, 38, 0.25);
+  --color-short-text: #dc2626;
+
+  --chart-bg: #ffffff;
+  --chart-grid: rgba(0, 0, 0, 0.04);
+  --chart-text: #64748b;
+}
+
+:root {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+}
+
+/* Global utility classes following the design tokens */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-weight: 400;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Smooth number flash keyframes */
+@keyframes flash-green {
+  0% { color: var(--color-long); background-color: var(--color-long-bg); }
+  100% { color: inherit; background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { color: var(--color-short); background-color: var(--color-short-bg); }
+  100% { color: inherit; background-color: transparent; }
+}
+
+.flash-up {
+  animation: flash-green 750ms ease-out;
+}
+
+.flash-down {
+  animation: flash-red 750ms ease-out;
+}
