@@ -8,6 +8,7 @@ export default function Header({
   timeLeftSec = 0,
   totalTicks = 60,
   isHost = false,
+  roomCode = '',
   theme,
   onToggleTheme,
   onRestartGame,
@@ -65,6 +66,21 @@ export default function Header({
             border: '1px solid var(--border-hairline)'
           }}>
             HOST
+          </span>
+        )}
+
+        {roomCode && (
+          <span style={{
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            padding: '2px 7px',
+            borderRadius: 'var(--radius-sm)',
+            backgroundColor: 'var(--bg-surface-elevated)',
+            border: '1px solid var(--border-hairline)',
+            color: 'var(--text-secondary)'
+          }} title={`Arena Room: ${roomCode}`}>
+            {roomCode}
           </span>
         )}
       </div>

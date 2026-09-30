@@ -15,6 +15,22 @@ export default function App() {
   const [myNickname, setMyNickname] = useState(() => localStorage.getItem('arena_nick') || '');
   const [myPlayerId, setMyPlayerId] = useState(null);
 
+  // Multi-room lifecycle & session tracking
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const initialRoomParam = (urlParams.get('room') || '').trim().toUpperCase();
+  const savedActiveRoom = typeof window !== 'undefined' ? (sessionStorage.getItem('arena_active_room') || '') : '';
+  const isResumingSession = Boolean(savedActiveRoom && initialRoomParam && savedActiveRoom === initialRoomParam);
+
+  const [inRoom, setInRoom] = useState(isResumingSession);
+  const [roomCode, setRoomCode] = useState(isResumingSession ? savedActiveRoom : initialRoomParam);
+
+  useEffect(() => {
+    // If visiting clean home screen (no ?room= in URL), clear any stale active room session
+    if (!initialRoomParam) {
+      sessionStorage.removeItem('arena_active_room');
+    }
+  }, [initialRoomParam]);
+
   const [game, setGame] = useState({
     state: 'LOBBY',
     config: { roundDurationSec: 180, numberOfRounds: 3, startingBalance: 10000, maxLeverage: 20 },
@@ -68,9 +84,11 @@ export default function App() {
 
       ws.onopen = () => {
         setConnected(true);
+        // Only auto-join if actively in a room session in this tab
+        const activeRoom = sessionStorage.getItem('arena_active_room');
         const savedNick = localStorage.getItem('arena_nick');
-        if (savedNick) {
-          ws.send(JSON.stringify({ type: 'JOIN', nickname: savedNick }));
+        if (activeRoom && savedNick) {
+          ws.send(JSON.stringify({ type: 'JOIN', nickname: savedNick, roomCode: activeRoom }));
         }
       };
 
@@ -80,9 +98,27 @@ export default function App() {
 
           switch (msg.type) {
             case 'JOINED':
+              setInRoom(true);
               setMyPlayerId(msg.playerId);
               setMyNickname(msg.nickname);
+              if (msg.roomCode) {
+                setRoomCode(msg.roomCode);
+                sessionStorage.setItem('arena_active_room', msg.roomCode);
+                const currentUrl = new URL(window.location.href);
+                if (currentUrl.searchParams.get('room') !== msg.roomCode) {
+                  currentUrl.searchParams.set('room', msg.roomCode);
+                  window.history.replaceState(null, '', currentUrl.toString());
+                }
+              }
               localStorage.setItem('arena_nick', msg.nickname);
+              break;
+
+            case 'LEFT_ROOM':
+              setInRoom(false);
+              setRoomCode('');
+              setMyPlayerId(null);
+              sessionStorage.removeItem('arena_active_room');
+              window.history.pushState(null, '', window.location.pathname);
               break;
 
             case 'GAME_STATE':
@@ -298,22 +334,69 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const sendJoin = (nickname) => {
+  const handleCreateRoom = (nickname, newRoomCode) => {
     const cleanNick = (nickname || '').trim().slice(0, 16);
-    if (!cleanNick) return;
+    const cleanCode = (newRoomCode || '').trim().toUpperCase().slice(0, 16);
+    if (!cleanNick || !cleanCode) return;
     setMyNickname(cleanNick);
     localStorage.setItem('arena_nick', cleanNick);
+    sessionStorage.setItem('arena_active_room', cleanCode);
+    setRoomCode(cleanCode);
+
+    const newUrl = `${window.location.pathname}?room=${cleanCode}`;
+    window.history.replaceState(null, '', newUrl);
 
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick }));
-    } else if (ws && ws.readyState === WebSocket.CONNECTING) {
-      const onOpenHandler = () => {
-        ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick }));
-        ws.removeEventListener('open', onOpenHandler);
-      };
-      ws.addEventListener('open', onOpenHandler);
+      ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick, roomCode: cleanCode }));
     }
+  };
+
+  const handleJoinRoom = (nickname, targetRoomCode) => {
+    const cleanNick = (nickname || '').trim().slice(0, 16);
+    const cleanCode = (targetRoomCode || '').trim().toUpperCase().slice(0, 16);
+    if (!cleanNick || !cleanCode) return;
+    setMyNickname(cleanNick);
+    localStorage.setItem('arena_nick', cleanNick);
+    sessionStorage.setItem('arena_active_room', cleanCode);
+    setRoomCode(cleanCode);
+
+    const newUrl = `${window.location.pathname}?room=${cleanCode}`;
+    window.history.replaceState(null, '', newUrl);
+
+    const ws = socketRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick, roomCode: cleanCode }));
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    sessionStorage.removeItem('arena_active_room');
+    setInRoom(false);
+    setRoomCode('');
+    setMyPlayerId(null);
+    setGame({
+      state: 'LOBBY',
+      config: { roundDurationSec: 180, numberOfRounds: 3, startingBalance: 10000, maxLeverage: 20 },
+      currentRoundIndex: 0,
+      totalRounds: 3,
+      hostPlayerId: null,
+      players: [],
+      roundSummary: null,
+      revealedDate: null,
+      betweenRoundCountdown: 0
+    });
+    setFinalResults(null);
+    window.history.pushState(null, '', window.location.pathname);
+
+    const ws = socketRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+    }
+  };
+
+  const sendJoin = (nickname) => {
+    handleJoinRoom(nickname, roomCode || initialRoomParam || 'ARENA-BTC');
   };
 
   const handleUpdateConfig = (newConfig) => {
@@ -420,20 +503,26 @@ export default function App() {
         timeLeftSec={tickData.timeLeftSec}
         totalTicks={tickData.totalTicks}
         isHost={isHost}
+        roomCode={inRoom ? (roomCode || game.roomCode) : ''}
         theme={theme}
         onToggleTheme={toggleTheme}
         onRestartGame={handleRestartGame}
         onEndGame={handleEndGame}
       />
 
-      {game.state === 'LOBBY' ? (
+      {!inRoom || game.state === 'LOBBY' ? (
         <Lobby
           isHost={isHost}
           players={game.players}
           config={game.config}
           myNickname={myNickname}
           myPlayerId={myPlayerId}
-          onJoin={sendJoin}
+          roomCode={roomCode || game.roomCode}
+          inRoom={inRoom}
+          initialRoomCode={initialRoomParam}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          onLeaveRoom={handleLeaveRoom}
           onUpdateConfig={handleUpdateConfig}
           onStartGame={handleStartGame}
         />
@@ -583,6 +672,7 @@ export default function App() {
           isHost={isHost}
           onRestartGame={handleRestartGame}
           onPlayAgain={handleRestartGame}
+          onLeaveRoom={handleLeaveRoom}
         />
       )}
 

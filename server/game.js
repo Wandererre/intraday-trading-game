@@ -12,8 +12,9 @@ export const GAME_STATES = {
 };
 
 export class GameManager {
-  constructor(broadcastCallback) {
+  constructor(broadcastCallback, roomCode = 'ARENA-BTC') {
     this.broadcast = broadcastCallback;
+    this.roomCode = roomCode;
     this.state = GAME_STATES.LOBBY;
 
     // Simplified config: 1 round duration slider (up to 15 min), 1 number of rounds slider, candle speed
@@ -63,11 +64,23 @@ export class GameManager {
   }
 
   addOrReconnectPlayer(id, nickname, ws) {
-    const cleanNick = nickname.trim().slice(0, 16);
+    let cleanNick = (nickname || 'Trader').trim().slice(0, 16);
     let playerId = id;
 
     if (this.nicknameToId.has(cleanNick)) {
-      playerId = this.nicknameToId.get(cleanNick);
+      const existingId = this.nicknameToId.get(cleanNick);
+      const existingSocket = this.clientSockets.get(existingId);
+      const isStillConnected = existingSocket && existingSocket.readyState === 1;
+
+      if (isStillConnected && existingId !== id) {
+        cleanNick = `${cleanNick.slice(0, 12)}_${Math.floor(10 + Math.random() * 90)}`;
+        this.nicknameToId.set(cleanNick, playerId);
+        const player = createInitialPlayer(playerId, cleanNick, this.config.startingBalance);
+        this.players.set(playerId, player);
+        this.engine.addPlayer(player);
+      } else {
+        playerId = existingId;
+      }
     } else {
       this.nicknameToId.set(cleanNick, playerId);
       const player = createInitialPlayer(playerId, cleanNick, this.config.startingBalance);
@@ -84,8 +97,65 @@ export class GameManager {
     return playerId;
   }
 
-  removeSocket(playerId) {
+  removePlayer(playerId) {
     this.clientSockets.delete(playerId);
+    const player = this.players.get(playerId);
+    if (player) {
+      this.nicknameToId.delete(player.nickname);
+      this.players.delete(playerId);
+      if (this.engine && this.engine.players) {
+        this.engine.players.delete(playerId);
+      }
+    }
+
+    if (this.hostPlayerId === playerId) {
+      const nextPlayer = this.players.values().next().value;
+      this.hostPlayerId = nextPlayer ? nextPlayer.id : null;
+    }
+
+    this.broadcastState();
+  }
+
+  handlePlayerDisconnect(playerId) {
+    if (this.state === GAME_STATES.LOBBY) {
+      // In lobby: remove player immediately so they don't linger as a ghost!
+      this.removePlayer(playerId);
+    } else {
+      // In active round: remove socket
+      this.clientSockets.delete(playerId);
+      if (this.getActiveSocketCount() === 0) {
+        this.destroy();
+      }
+    }
+  }
+
+  removeSocket(playerId) {
+    this.handlePlayerDisconnect(playerId);
+  }
+
+  getActiveSocketCount() {
+    let count = 0;
+    for (const ws of this.clientSockets.values()) {
+      if (ws.readyState === 1) count++;
+    }
+    return count;
+  }
+
+  destroy() {
+    if (this.tickTimer) {
+      clearInterval(this.tickTimer);
+      this.tickTimer = null;
+    }
+    if (this.betweenRoundTimer) {
+      clearInterval(this.betweenRoundTimer);
+      this.betweenRoundTimer = null;
+    }
+    this.clientSockets.clear();
+    this.players.clear();
+    this.nicknameToId.clear();
+    if (this.engine && this.engine.players) {
+      this.engine.players.clear();
+    }
   }
 
   startGame() {
@@ -259,6 +329,15 @@ export class GameManager {
       maxLeverage: this.config.maxLeverage,
       startingBalance: this.config.startingBalance
     });
+
+    // Prune any disconnected players before restarting
+    for (const [id, player] of Array.from(this.players.entries())) {
+      const sock = this.clientSockets.get(id);
+      if (!sock || sock.readyState !== 1) {
+        this.players.delete(id);
+        this.nicknameToId.delete(player.nickname);
+      }
+    }
 
     // Reset each player for a fresh new match while preserving connection & rules
     for (const player of this.players.values()) {
@@ -563,6 +642,7 @@ export class GameManager {
     });
 
     return {
+      roomCode: this.roomCode,
       state: this.state,
       config: this.config,
       currentRoundIndex: this.currentRoundIndex,

@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
 
+function generateRandomRoomCode() {
+  const words = ['BULL', 'BEAR', 'MOON', 'APEX', 'NOVA', 'PUMP', 'WAVE', 'SWAP'];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num = Math.floor(10 + Math.random() * 90);
+  return `${word}-${num}`;
+}
+
 export default function Lobby({
   players = [],
   isHost = false,
   config = {},
   myNickname = '',
-  onJoin,
+  myPlayerId = '',
+  roomCode = '',
+  inRoom = false,
+  initialRoomCode = '',
+  onCreateRoom,
+  onJoinRoom,
+  onLeaveRoom,
   onUpdateConfig,
   onStartGame
 }) {
-  const [nicknameInput, setNicknameInput] = useState('');
+  const [nicknameInput, setNicknameInput] = useState(() => localStorage.getItem('arena_nick') || '');
+  const [joinRoomInput, setJoinRoomInput] = useState(initialRoomCode || '');
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [showCustomRoomInput, setShowCustomRoomInput] = useState(false);
 
   // Simplified settings: 1 slider for duration (1 to 15 min), 1 slider for rounds (1 to 5)
   const [durationMin, setDurationMin] = useState(Math.round((config.roundDurationSec || 180) / 60));
@@ -20,25 +35,41 @@ export default function Lobby({
   const [seed, setSeed] = useState(config.seed || '');
   const [candleDurationSec, setCandleDurationSec] = useState(config.candleDurationSec || 15);
 
-  const joinUrl = window.location.origin;
-  const shortCode = 'ARENA-BTC';
+  const activeRoomCode = roomCode || initialRoomCode || 'ARENA-BTC';
 
   const handleCopyLink = () => {
+    const joinUrl = `${window.location.origin}/?room=${activeRoomCode}`;
     navigator.clipboard.writeText(joinUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(shortCode);
+    navigator.clipboard.writeText(activeRoomCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleJoinSubmit = (e) => {
+  const handleCreateSubmit = (e) => {
     e.preventDefault();
-    if (!nicknameInput.trim()) return;
-    onJoin(nicknameInput.trim());
+    const cleanNick = nicknameInput.trim();
+    if (!cleanNick) return;
+    const newRoomCode = generateRandomRoomCode();
+    if (onCreateRoom) {
+      onCreateRoom(cleanNick, newRoomCode);
+    } else if (onJoinRoom) {
+      onJoinRoom(cleanNick, newRoomCode);
+    }
+  };
+
+  const handleJoinExistingSubmit = (e) => {
+    e.preventDefault();
+    const cleanNick = nicknameInput.trim();
+    const cleanRoom = (joinRoomInput.trim() || initialRoomCode || 'ARENA-BTC').toUpperCase();
+    if (!cleanNick) return;
+    if (onJoinRoom) {
+      onJoinRoom(cleanNick, cleanRoom);
+    }
   };
 
   const handleConfigChange = (newMin, newRounds, newLev, newSeed, newCandleSec) => {
@@ -51,28 +82,80 @@ export default function Lobby({
     });
   };
 
-  if (!myNickname) {
+  // HOME SCREEN (Before entering or creating a room)
+  if (!inRoom) {
     return (
       <div style={{
-        maxWidth: '400px',
-        margin: '80px auto',
+        maxWidth: '440px',
+        margin: '60px auto',
         padding: '0 20px',
         width: '100%'
       }}>
-        <div className="card" style={{ padding: '28px' }}>
+        <div className="card" style={{ padding: '28px', boxShadow: '0 12px 32px rgba(0,0,0,0.06)' }}>
           <div style={{ textAlign: 'center', marginBottom: '22px' }}>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em', marginBottom: '6px' }}>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: 'var(--accent)'
+            }}>
+              Multiplayer Trading Simulation
+            </span>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', marginTop: '4px', marginBottom: '6px' }}>
               INTRADAY TRADING ARENA
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Multiplayer accelerated historical crypto trading. Enter nickname to join.
+              Compete in accelerated historical markets. Pure server-authoritative trading.
             </p>
           </div>
 
-          <form onSubmit={handleJoinSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* If user clicked an invite link with ?room=CODE */}
+          {initialRoomCode && (
+            <div style={{
+              backgroundColor: 'var(--accent-subtle)',
+              border: '1px solid var(--accent)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+              marginBottom: '16px',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>Invited to room: </span>
+                <strong style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{initialRoomCode}</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setJoinRoomInput('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Change
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Trader Nickname
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                color: 'var(--text-secondary)',
+                marginBottom: '6px'
+              }}>
+                Your Trader Nickname
               </label>
               <input
                 type="text"
@@ -86,20 +169,75 @@ export default function Lobby({
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={!nicknameInput.trim()}
-              className="btn-base btn-primary"
-              style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
-            >
-              ENTER ARENA
-            </button>
-          </form>
+            {/* Direct Join button if invite room code is present */}
+            {initialRoomCode ? (
+              <button
+                type="button"
+                onClick={handleJoinExistingSubmit}
+                disabled={!nicknameInput.trim()}
+                className="btn-base btn-primary"
+                style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
+              >
+                JOIN ROOM {initialRoomCode}
+              </button>
+            ) : (
+              <>
+                {/* Create Room Action */}
+                <button
+                  type="button"
+                  onClick={handleCreateSubmit}
+                  disabled={!nicknameInput.trim()}
+                  className="btn-base btn-primary"
+                  style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
+                >
+                  CREATE NEW ROOM
+                </button>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  margin: '6px 0',
+                  color: 'var(--text-muted)',
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em'
+                }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-hairline)' }} />
+                  <span>or join existing</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-hairline)' }} />
+                </div>
+
+                {/* Join Existing Room */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Room Code (e.g. BULL-82)"
+                    maxLength={16}
+                    value={joinRoomInput}
+                    onChange={(e) => setJoinRoomInput(e.target.value.toUpperCase())}
+                    className="input-base"
+                    style={{ flex: 1, fontSize: '13px', padding: '9px 12px', textTransform: 'uppercase' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleJoinExistingSubmit}
+                    disabled={!nicknameInput.trim()}
+                    className="btn-base btn-outline"
+                    style={{ padding: '9px 16px', fontWeight: 600, fontSize: '13px' }}
+                  >
+                    JOIN
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
+  // ACTIVE ROOM LOBBY SCREEN (Waiting for Host to start)
   return (
     <div style={{
       maxWidth: '680px',
@@ -131,16 +269,17 @@ export default function Lobby({
                 padding: '2px 6px',
                 borderRadius: 'var(--radius-sm)'
               }}>
-                {shortCode}
+                {activeRoomCode}
               </code>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               onClick={handleCopyCode}
               className="btn-base btn-outline"
               style={{ fontSize: '11px', padding: '6px 10px', fontWeight: 600 }}
+              title="Copy Room Code to clipboard"
             >
               {copiedCode ? 'COPIED' : 'COPY CODE'}
             </button>
@@ -149,13 +288,32 @@ export default function Lobby({
               onClick={handleCopyLink}
               className="btn-base btn-outline"
               style={{ fontSize: '11px', padding: '6px 10px', fontWeight: 600 }}
+              title="Copy shareable link for friends to join this exact room"
             >
               {copiedLink ? 'COPIED' : 'COPY JOIN LINK'}
             </button>
+
+            {onLeaveRoom && (
+              <button
+                onClick={onLeaveRoom}
+                className="btn-base"
+                style={{
+                  fontSize: '11px',
+                  padding: '6px 10px',
+                  fontWeight: 600,
+                  backgroundColor: 'var(--bg-page)',
+                  border: '1px solid var(--border-hairline)',
+                  color: 'var(--text-secondary)'
+                }}
+                title="Leave room and return to home screen"
+              >
+                ← LEAVE ROOM
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Players List */}
+        {/* Connected Players List */}
         <div>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
             Connected Traders ({players.length})

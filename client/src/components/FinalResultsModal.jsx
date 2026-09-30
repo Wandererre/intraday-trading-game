@@ -19,7 +19,8 @@ export default function FinalResultsModal({
   revealedDate = '',
   isHost = false,
   onRestartGame,
-  onPlayAgain
+  onPlayAgain,
+  onLeaveRoom
 }) {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
@@ -425,6 +426,23 @@ export default function FinalResultsModal({
                 }}
               >
                 Restart Game (Keep Everyone Connected)
+              </button>
+            )}
+
+            {onLeaveRoom && (
+              <button
+                onClick={onLeaveRoom}
+                className="btn-base"
+                style={{
+                  fontSize: '12px',
+                  backgroundColor: 'var(--bg-page)',
+                  border: '1px solid var(--border-hairline)',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 600
+                }}
+                title="Leave room and return to home screen"
+              >
+                ← Exit to Home
               </button>
             )}
 

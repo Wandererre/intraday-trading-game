@@ -63,19 +63,53 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocketServer({ server });
 
-function broadcastToAll(data) {
-  const json = JSON.stringify(data);
-  for (const client of wss.clients) {
-    if (client.readyState === 1) {
-      client.send(json);
+class RoomManager {
+  constructor(wss) {
+    this.wss = wss;
+    this.rooms = new Map(); // roomCode (uppercase) -> GameManager
+  }
+
+  getOrCreateRoom(roomCode = 'ARENA-BTC') {
+    const code = (roomCode || 'ARENA-BTC').trim().toUpperCase().slice(0, 16);
+    if (!this.rooms.has(code)) {
+      const roomGame = new GameManager((data) => this.broadcastToRoom(code, data), code);
+      this.rooms.set(code, roomGame);
+      console.log(`[RoomManager] Created room: ${code}`);
+    }
+    return this.rooms.get(code);
+  }
+
+  getRoom(roomCode) {
+    if (!roomCode) return null;
+    return this.rooms.get(roomCode.trim().toUpperCase());
+  }
+
+  deleteRoom(roomCode) {
+    const code = (roomCode || '').trim().toUpperCase();
+    const room = this.rooms.get(code);
+    if (room) {
+      room.destroy();
+      this.rooms.delete(code);
+      console.log(`[RoomManager] Deleted room: ${code}. Active rooms remaining: ${this.rooms.size}`);
+    }
+  }
+
+  broadcastToRoom(roomCode, data) {
+    const room = this.rooms.get(roomCode);
+    if (!room) return;
+    const json = JSON.stringify(data);
+    for (const ws of room.clientSockets.values()) {
+      if (ws.readyState === 1) {
+        ws.send(json);
+      }
     }
   }
 }
 
-const game = new GameManager(broadcastToAll);
+const roomManager = new RoomManager(wss);
 
 function isAuthorizedHost(boundPlayerId, game) {
-  if (!boundPlayerId) return false;
+  if (!boundPlayerId || !game) return false;
   if (game.hostPlayerId && game.hostPlayerId === boundPlayerId) return true;
   const hostSocket = game.hostPlayerId ? game.clientSockets.get(game.hostPlayerId) : null;
   const isHostConnected = hostSocket && hostSocket.readyState === 1;
@@ -92,25 +126,68 @@ function isAuthorizedHost(boundPlayerId, game) {
 }
 
 wss.on('connection', (ws) => {
+  let boundRoomCode = null;
   let boundPlayerId = null;
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
 
-      switch (data.type) {
-        case 'JOIN': {
-          const nickname = data.nickname || 'Trader_' + Math.floor(Math.random() * 1000);
-          const socketId = 'sock_' + Math.random().toString(36).substring(2, 9);
-          boundPlayerId = game.addOrReconnectPlayer(socketId, nickname, ws);
-          ws.send(JSON.stringify({
-            type: 'JOINED',
-            playerId: boundPlayerId,
-            nickname
-          }));
-          break;
+      if (data.type === 'JOIN') {
+        const rawCode = data.roomCode || 'ARENA-BTC';
+        const roomCode = rawCode.trim().toUpperCase().slice(0, 16);
+        const nickname = (data.nickname || 'Trader_' + Math.floor(Math.random() * 1000)).trim().slice(0, 16);
+        const socketId = 'sock_' + Math.random().toString(36).substring(2, 9);
+
+        // If previously bound to another room on this socket, leave it cleanly first
+        if (boundRoomCode && boundPlayerId && boundRoomCode !== roomCode) {
+          const prevRoom = roomManager.getRoom(boundRoomCode);
+          if (prevRoom) {
+            prevRoom.handlePlayerDisconnect(boundPlayerId);
+            if (prevRoom.getActiveSocketCount() === 0) {
+              roomManager.deleteRoom(boundRoomCode);
+            }
+          }
         }
 
+        const game = roomManager.getOrCreateRoom(roomCode);
+        boundRoomCode = roomCode;
+        boundPlayerId = game.addOrReconnectPlayer(socketId, nickname, ws);
+
+        ws.send(JSON.stringify({
+          type: 'JOINED',
+          playerId: boundPlayerId,
+          nickname,
+          roomCode
+        }));
+        return;
+      }
+
+      if (data.type === 'LEAVE_ROOM') {
+        if (boundRoomCode && boundPlayerId) {
+          const game = roomManager.getRoom(boundRoomCode);
+          if (game) {
+            game.removePlayer(boundPlayerId);
+            if (game.getActiveSocketCount() === 0) {
+              roomManager.deleteRoom(boundRoomCode);
+            }
+          }
+          ws.send(JSON.stringify({ type: 'LEFT_ROOM' }));
+          boundRoomCode = null;
+          boundPlayerId = null;
+        }
+        return;
+      }
+
+      if (data.type === 'PING') {
+        ws.send(JSON.stringify({ type: 'PONG' }));
+        return;
+      }
+
+      const game = boundRoomCode ? roomManager.getRoom(boundRoomCode) : null;
+      if (!game) return;
+
+      switch (data.type) {
         case 'HOST_CONFIG': {
           if (isAuthorizedHost(boundPlayerId, game)) {
             game.updateConfig(data.config);
@@ -246,11 +323,6 @@ wss.on('connection', (ws) => {
           break;
         }
 
-        case 'PING': {
-          ws.send(JSON.stringify({ type: 'PONG' }));
-          break;
-        }
-
         default:
           break;
       }
@@ -260,8 +332,16 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    if (boundPlayerId) {
-      game.removeSocket(boundPlayerId);
+    if (boundRoomCode && boundPlayerId) {
+      const game = roomManager.getRoom(boundRoomCode);
+      if (game) {
+        game.handlePlayerDisconnect(boundPlayerId);
+        if (game.getActiveSocketCount() === 0) {
+          roomManager.deleteRoom(boundRoomCode);
+        }
+      }
+      boundRoomCode = null;
+      boundPlayerId = null;
     }
   });
 });
