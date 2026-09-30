@@ -269,7 +269,10 @@ wss.on('connection', (ws) => {
 
         case 'HOST_START_GAME': {
           if (isAuthorizedHost(boundPlayerId, game)) {
-            game.startGame();
+            const started = game.startGame();
+            console.log(`[Host Action] startGame in room ${boundRoomCode} started: ${started}`);
+          } else {
+            console.warn(`[Host Action] Rejected HOST_START_GAME from non-host ${boundPlayerId} in room ${boundRoomCode}`);
           }
           break;
         }

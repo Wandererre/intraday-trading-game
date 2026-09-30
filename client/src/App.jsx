@@ -54,6 +54,7 @@ export default function App() {
 
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const myPlayerIdRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -86,6 +87,7 @@ export default function App() {
             case 'JOINED':
               setInRoom(true);
               setMyPlayerId(msg.playerId);
+              myPlayerIdRef.current = msg.playerId;
               setMyNickname(msg.nickname);
               if (msg.roomCode) {
                 setRoomCode(msg.roomCode);
@@ -102,6 +104,7 @@ export default function App() {
               setInRoom(false);
               setRoomCode('');
               setMyPlayerId(null);
+              myPlayerIdRef.current = null;
               setGame(prev => ({
                 ...prev,
                 state: 'LOBBY',
@@ -122,6 +125,7 @@ export default function App() {
               setInRoom(false);
               setRoomCode('');
               setMyPlayerId(null);
+              myPlayerIdRef.current = null;
               setGame(prev => ({
                 ...prev,
                 state: 'LOBBY',
@@ -206,8 +210,9 @@ export default function App() {
                 };
               });
 
-              if (myPlayerId) {
-                const me = msg.leaderboard?.find(p => p.id === myPlayerId);
+              const curId = myPlayerIdRef.current || myPlayerId;
+              if (curId) {
+                const me = msg.leaderboard?.find(p => p.id === curId);
                 if (me) {
                   setMyState(prev => ({
                     ...(prev || {}),
@@ -335,7 +340,7 @@ export default function App() {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (socketRef.current) socketRef.current.close();
     };
-  }, [myPlayerId]);
+  }, []);
 
   const addToast = (type, message) => {
     const id = 'toast_' + Date.now();
@@ -352,7 +357,6 @@ export default function App() {
     if (!cleanNick || !cleanCode) return;
     setMyNickname(cleanNick);
     localStorage.setItem('arena_nick', cleanNick);
-    sessionStorage.setItem('arena_active_room', cleanCode);
     setRoomCode(cleanCode);
 
     const newUrl = `${window.location.pathname}?room=${cleanCode}`;
@@ -361,6 +365,12 @@ export default function App() {
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'CREATE_ROOM', nickname: cleanNick, roomCode: cleanCode }));
+    } else if (ws && ws.readyState === WebSocket.CONNECTING) {
+      const onOpenHandler = () => {
+        ws.send(JSON.stringify({ type: 'CREATE_ROOM', nickname: cleanNick, roomCode: cleanCode }));
+        ws.removeEventListener('open', onOpenHandler);
+      };
+      ws.addEventListener('open', onOpenHandler);
     }
   };
 
@@ -372,9 +382,18 @@ export default function App() {
     localStorage.setItem('arena_nick', cleanNick);
     setRoomCode(cleanCode);
 
+    const newUrl = `${window.location.pathname}?room=${cleanCode}`;
+    window.history.replaceState(null, '', newUrl);
+
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'JOIN_ROOM', nickname: cleanNick, roomCode: cleanCode }));
+    } else if (ws && ws.readyState === WebSocket.CONNECTING) {
+      const onOpenHandler = () => {
+        ws.send(JSON.stringify({ type: 'JOIN_ROOM', nickname: cleanNick, roomCode: cleanCode }));
+        ws.removeEventListener('open', onOpenHandler);
+      };
+      ws.addEventListener('open', onOpenHandler);
     }
   };
 
