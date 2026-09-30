@@ -66,34 +66,50 @@ export default function Chart({
     seriesRef.current = series;
 
     if (candles.length > 0) {
-      const map = new Map();
-      candles.forEach((c) => {
-        const t = c.time || Math.floor(c.timestamp / 1000);
-        map.set(t, {
-          time: t,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close
+      try {
+        const map = new Map();
+        candles.forEach((c) => {
+          if (!c) return;
+          const t = Number(c.time || Math.floor(c.timestamp / 1000));
+          if (!Number.isFinite(t)) return;
+          map.set(t, {
+            time: t,
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close)
+          });
         });
-      });
-      const uniqueData = Array.from(map.values()).sort((a, b) => a.time - b.time);
-      series.setData(uniqueData);
-      chart.timeScale().fitContent();
+        const uniqueData = Array.from(map.values())
+          .filter(c => Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
+          .sort((a, b) => a.time - b.time);
+        if (uniqueData.length > 0) {
+          series.setData(uniqueData);
+          chart.timeScale().fitContent();
+        }
+      } catch (err) {
+        console.warn('Initial chart setData error:', err);
+      }
     }
 
     const resizeObserver = new ResizeObserver((entries) => {
       if (entries[0] && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: entries[0].contentRect.width
-        });
+        try {
+          chartRef.current.applyOptions({
+            width: entries[0].contentRect.width
+          });
+        } catch (e) {}
       }
     });
     resizeObserver.observe(containerRef.current);
 
     return () => {
-      resizeObserver.disconnect();
-      chart.remove();
+      try {
+        resizeObserver.disconnect();
+        if (chartRef.current) {
+          chartRef.current.remove();
+        }
+      } catch (e) {}
       chartRef.current = null;
       seriesRef.current = null;
       priceLinesRef.current = [];
@@ -107,56 +123,90 @@ export default function Chart({
     // Clear old position price lines
     priceLinesRef.current.forEach(line => {
       try {
-        seriesRef.current.removePriceLine(line);
+        if (seriesRef.current && line) {
+          seriesRef.current.removePriceLine(line);
+        }
       } catch (e) {}
     });
     priceLinesRef.current = [];
 
-    const map = new Map();
-    candles.forEach((c) => {
-      const t = c.time || Math.floor(c.timestamp / 1000);
-      map.set(t, {
-        time: t,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close
+    try {
+      const map = new Map();
+      candles.forEach((c) => {
+        if (!c) return;
+        const t = Number(c.time || Math.floor(c.timestamp / 1000));
+        if (!Number.isFinite(t)) return;
+        map.set(t, {
+          time: t,
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close)
+        });
       });
-    });
-    const uniqueData = Array.from(map.values()).sort((a, b) => a.time - b.time);
-    seriesRef.current.setData(uniqueData);
-    chartRef.current.timeScale().fitContent();
+      const uniqueData = Array.from(map.values())
+        .filter(c => Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
+        .sort((a, b) => a.time - b.time);
+      if (uniqueData.length > 0) {
+        seriesRef.current.setData(uniqueData);
+        chartRef.current.timeScale().fitContent();
+      }
+    } catch (err) {
+      console.warn('Round change chart setData error:', err);
+    }
   }, [roundIndex]);
 
   // Update on new sub-tick
   useEffect(() => {
     if (!seriesRef.current || !currentCandle) return;
-    const time = currentCandle.time || Math.floor(currentCandle.timestamp / 1000);
+    const time = Number(currentCandle.time || Math.floor(currentCandle.timestamp / 1000));
+    if (!Number.isFinite(time)) return;
+
+    const candleObj = {
+      time,
+      open: Number(currentCandle.open),
+      high: Number(currentCandle.high),
+      low: Number(currentCandle.low),
+      close: Number(currentCandle.close)
+    };
+
+    if (
+      !Number.isFinite(candleObj.open) ||
+      !Number.isFinite(candleObj.high) ||
+      !Number.isFinite(candleObj.low) ||
+      !Number.isFinite(candleObj.close)
+    ) {
+      return;
+    }
 
     try {
-      seriesRef.current.update({
-        time,
-        open: currentCandle.open,
-        high: currentCandle.high,
-        low: currentCandle.low,
-        close: currentCandle.close
-      });
+      seriesRef.current.update(candleObj);
     } catch (e) {
       // Fallback recovery if timestamps shifted across rounds
-      const map = new Map();
-      candles.forEach((c) => {
-        const t = c.time || Math.floor(c.timestamp / 1000);
-        map.set(t, { time: t, open: c.open, high: c.high, low: c.low, close: c.close });
-      });
-      map.set(time, {
-        time,
-        open: currentCandle.open,
-        high: currentCandle.high,
-        low: currentCandle.low,
-        close: currentCandle.close
-      });
-      const uniqueData = Array.from(map.values()).sort((a, b) => a.time - b.time);
-      seriesRef.current.setData(uniqueData);
+      try {
+        const map = new Map();
+        candles.forEach((c) => {
+          if (!c) return;
+          const t = Number(c.time || Math.floor(c.timestamp / 1000));
+          if (!Number.isFinite(t)) return;
+          map.set(t, {
+            time: t,
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close)
+          });
+        });
+        map.set(time, candleObj);
+        const uniqueData = Array.from(map.values())
+          .filter(c => Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
+          .sort((a, b) => a.time - b.time);
+        if (uniqueData.length > 0) {
+          seriesRef.current.setData(uniqueData);
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback chart setData error:', fallbackErr);
+      }
     }
   }, [currentCandle]);
 
@@ -167,7 +217,9 @@ export default function Chart({
     // Clear old price lines
     priceLinesRef.current.forEach(line => {
       try {
-        seriesRef.current.removePriceLine(line);
+        if (seriesRef.current && line) {
+          seriesRef.current.removePriceLine(line);
+        }
       } catch (e) {}
     });
     priceLinesRef.current = [];
@@ -177,28 +229,36 @@ export default function Chart({
       : (playerPosition ? [playerPosition] : []);
 
     activeList.forEach(pos => {
-      if (pos && pos.entryPrice) {
-        const entryLine = seriesRef.current.createPriceLine({
-          price: pos.entryPrice,
-          color: pos.side === 'LONG' ? '#10b981' : '#ef4444',
-          lineWidth: 1,
-          lineStyle: LineStyle.Solid,
-          axisLabelVisible: true,
-          title: `${pos.side} ${pos.leverage}x`
-        });
-        priceLinesRef.current.push(entryLine);
+      if (!pos || !seriesRef.current) return;
 
-        if (pos.liquidationPrice > 0) {
+      const entryPrice = Number(pos.entryPrice);
+      if (Number.isFinite(entryPrice) && entryPrice > 0) {
+        try {
+          const entryLine = seriesRef.current.createPriceLine({
+            price: entryPrice,
+            color: pos.side === 'LONG' ? '#10b981' : '#ef4444',
+            lineWidth: 1,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: `${pos.side || ''} ${pos.leverage || 1}x`
+          });
+          if (entryLine) priceLinesRef.current.push(entryLine);
+        } catch (e) {}
+      }
+
+      const liqPrice = Number(pos.liquidationPrice);
+      if (Number.isFinite(liqPrice) && liqPrice > 0) {
+        try {
           const liqLine = seriesRef.current.createPriceLine({
-            price: pos.liquidationPrice,
+            price: liqPrice,
             color: '#ef4444',
             lineWidth: 1,
             lineStyle: LineStyle.Dashed,
             axisLabelVisible: true,
-            title: `LIQ (${pos.side})`
+            title: `LIQ (${pos.side || ''})`
           });
-          priceLinesRef.current.push(liqLine);
-        }
+          if (liqLine) priceLinesRef.current.push(liqLine);
+        } catch (e) {}
       }
     });
   }, [positions, playerPosition]);

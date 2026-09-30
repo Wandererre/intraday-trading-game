@@ -233,28 +233,32 @@ export class GameManager {
   stepGameTick() {
     if (this.state !== GAME_STATES.ROUND_ACTIVE) return;
 
-    const intentsToProcess = [...this.queuedIntents];
-    this.queuedIntents = [];
+    try {
+      const intentsToProcess = [...this.queuedIntents];
+      this.queuedIntents = [];
 
-    const stepResult = this.engine.stepTick(intentsToProcess);
+      const stepResult = this.engine.stepTick(intentsToProcess);
 
-    if (!stepResult) {
-      this.endCurrentRound();
-      return;
+      if (!stepResult) {
+        this.endCurrentRound();
+        return;
+      }
+
+      // Broadcast tick packet
+      this.broadcast({
+        type: 'TICK',
+        roundIndex: this.currentRoundIndex,
+        tickIndex: stepResult.tickIndex,
+        totalTicks: stepResult.totalTicks,
+        timeLeftSec: stepResult.timeLeftSec,
+        price: stepResult.currentPrice,
+        candle: stepResult.candle,
+        leaderboard: stepResult.leaderboard,
+        feed: stepResult.feed
+      });
+    } catch (err) {
+      console.error('[stepGameTick Error]:', err);
     }
-
-    // Broadcast tick packet
-    this.broadcast({
-      type: 'TICK',
-      roundIndex: this.currentRoundIndex,
-      tickIndex: stepResult.tickIndex,
-      totalTicks: stepResult.totalTicks,
-      timeLeftSec: stepResult.timeLeftSec,
-      price: stepResult.currentPrice,
-      candle: stepResult.candle,
-      leaderboard: stepResult.leaderboard,
-      feed: stepResult.feed
-    });
   }
 
   endCurrentRound() {
@@ -622,19 +626,23 @@ export class GameManager {
       roundBalances: enginePlayer.roundBalances || [],
       totalCumulativeScore: Math.round((prevTotal + equity) * 100) / 100,
       isLiquidated: enginePlayer.isLiquidated,
-      positions: (enginePlayer.positions || []).map(p => ({
-        id: p.id,
-        side: p.side,
-        size: Math.round(p.size * 1000) / 1000,
-        entryPrice: p.entryPrice,
-        leverage: p.leverage,
-        margin: Math.round(p.margin * 100) / 100,
-        liquidationPrice: p.liquidationPrice,
-        unrealizedPnL: Math.round(this.engine.calculatePositionPnL(p, currentPrice) * 100) / 100,
-        pnlPct: Math.round((this.engine.calculatePositionPnL(p, currentPrice) / p.margin) * 1000) / 10,
-        stopLossPct: p.stopLossPct || null,
-        takeProfitPct: p.takeProfitPct || null
-      })),
+      positions: (enginePlayer.positions || []).map(p => {
+        const posPnL = Math.round(this.engine.calculatePositionPnL(p, currentPrice) * 100) / 100;
+        return {
+          id: p.id,
+          side: p.side,
+          size: Math.round(p.size * 1000) / 1000,
+          entryPrice: p.entryPrice,
+          leverage: p.leverage,
+          margin: Math.round(p.margin * 100) / 100,
+          liquidationPrice: p.liquidationPrice,
+          pnl: posPnL,
+          unrealizedPnL: posPnL,
+          pnlPct: Math.round((posPnL / (p.margin || 1)) * 1000) / 10,
+          stopLossPct: p.stopLossPct || null,
+          takeProfitPct: p.takeProfitPct || null
+        };
+      }),
       position: (enginePlayer.positions && enginePlayer.positions.length > 0) ? {
         side: enginePlayer.position.side,
         size: Math.round(enginePlayer.position.size * 1000) / 1000,
@@ -642,8 +650,9 @@ export class GameManager {
         leverage: enginePlayer.position.leverage,
         margin: Math.round(enginePlayer.position.margin * 100) / 100,
         liquidationPrice: enginePlayer.position.liquidationPrice,
+        pnl: Math.round(uPnL * 100) / 100,
         unrealizedPnL: Math.round(uPnL * 100) / 100,
-        pnlPct: Math.round((uPnL / enginePlayer.position.margin) * 1000) / 10,
+        pnlPct: Math.round((uPnL / (enginePlayer.position.margin || 1)) * 1000) / 10,
         stopLossPct: enginePlayer.position.stopLossPct || null,
         takeProfitPct: enginePlayer.position.takeProfitPct || null
       } : null,

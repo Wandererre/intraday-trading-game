@@ -1,11 +1,38 @@
 import React, { useState } from 'react';
 
+const safeNum = (v, defaultVal = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : defaultVal;
+};
+
+const formatPrice = (v, dec = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(dec) : '-';
+};
+
+const formatCurrency = (v, dec = 1) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : '-';
+};
+
+const formatPnl = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+};
+
+const formatPct = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0';
+};
+
 function TpSlModal({ tradeType, trade, currentPrice, onClose, onSave }) {
+  if (!trade) return null;
   const isPos = tradeType === 'POSITION';
   const isLong = trade.side === 'LONG';
-  const lev = trade.leverage || 1;
-  const entryPrice = isPos ? (trade.entryPrice || currentPrice) : (trade.limitPrice || currentPrice);
-  const margin = trade.margin || trade.reservedMargin || 100;
+  const lev = Math.max(1, safeNum(trade.leverage, 1));
+  const rawEntry = isPos ? (trade.entryPrice ?? currentPrice) : (trade.limitPrice ?? currentPrice);
+  const entryPrice = safeNum(rawEntry, 0);
+  const margin = safeNum(trade.margin || trade.reservedMargin, 100);
 
   const [tpStr, setTpStr] = useState(trade.takeProfitPct ? String(trade.takeProfitPct) : '');
   const [slStr, setSlStr] = useState(trade.stopLossPct ? String(trade.stopLossPct) : '');
@@ -122,7 +149,7 @@ function TpSlModal({ tradeType, trade, currentPrice, onClose, onSave }) {
               {trade.side} {lev}x
             </span>
             <span className="tabular-nums" style={{ fontWeight: 600 }}>
-              ${entryPrice?.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              ${formatCurrency(entryPrice, 1)}
             </span>
           </div>
 
@@ -131,9 +158,9 @@ function TpSlModal({ tradeType, trade, currentPrice, onClose, onSave }) {
             {isPos && (
               <span className="tabular-nums" style={{
                 fontWeight: 700,
-                color: (trade.pnl || 0) >= 0 ? 'var(--color-long)' : 'var(--color-short)'
+                color: safeNum(trade.pnl ?? trade.unrealizedPnL, 0) >= 0 ? 'var(--color-long)' : 'var(--color-short)'
               }}>
-                {(trade.pnl || 0) >= 0 ? '+' : ''}${trade.pnl?.toFixed(2)}
+                {safeNum(trade.pnl ?? trade.unrealizedPnL, 0) >= 0 ? '+' : ''}${formatPnl(trade.pnl ?? trade.unrealizedPnL)}
               </span>
             )}
           </div>
@@ -146,9 +173,9 @@ function TpSlModal({ tradeType, trade, currentPrice, onClose, onSave }) {
               <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-long)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Take Profit (%)
               </label>
-              {tpTargetPrice && (
+              {tpTargetPrice && Number.isFinite(tpTargetPrice) && (
                 <span className="tabular-nums" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-long)' }}>
-                  Exit @ ${tpTargetPrice.toFixed(1)} (+${tpEstProfit?.toFixed(2)})
+                  Exit @ ${formatPrice(tpTargetPrice, 1)} (+${formatPnl(tpEstProfit)})
                 </span>
               )}
             </div>
@@ -216,9 +243,9 @@ function TpSlModal({ tradeType, trade, currentPrice, onClose, onSave }) {
               <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-short)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Stop Loss (%)
               </label>
-              {slTargetPrice && (
+              {slTargetPrice && Number.isFinite(slTargetPrice) && (
                 <span className="tabular-nums" style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-short)' }}>
-                  Exit @ ${slTargetPrice.toFixed(1)} (-${slEstLoss?.toFixed(2)})
+                  Exit @ ${formatPrice(slTargetPrice, 1)} (-${formatPnl(slEstLoss)})
                 </span>
               )}
             </div>
@@ -460,8 +487,10 @@ export default function PositionsTab({
 
                   {limitOrders.map((ord) => {
                     const isLong = ord.side === 'LONG';
-                    const distPct = currentPrice > 0
-                      ? (((ord.limitPrice - currentPrice) / currentPrice) * 100).toFixed(1)
+                    const lPrice = safeNum(ord.limitPrice, 0);
+                    const cPrice = safeNum(currentPrice, 0);
+                    const distPct = cPrice > 0
+                      ? (((lPrice - cPrice) / cPrice) * 100).toFixed(1)
                       : '0.0';
 
                     return (
@@ -505,15 +534,15 @@ export default function PositionsTab({
                         </div>
 
                         <div className="tabular-nums" style={{ fontWeight: 600, color: '#f59e0b' }}>
-                          ${ord.limitPrice?.toFixed(0)}
+                          ${formatPrice(ord.limitPrice, 0)}
                         </div>
 
                         <div className="tabular-nums" style={{ fontSize: '11px', color: '#94a3b8' }}>
-                          {distPct > 0 ? `+${distPct}` : distPct}%
+                          {Number(distPct) > 0 ? `+${distPct}` : distPct}%
                         </div>
 
                         <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                          ${ord.reservedMargin || ord.margin}
+                          ${safeNum(ord.reservedMargin || ord.margin, 0)}
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
@@ -628,7 +657,9 @@ export default function PositionsTab({
 
                   {myPositions.map(({ pos }) => {
                     const isLong = pos.side === 'LONG';
-                    const isProfit = (pos.pnl || 0) >= 0;
+                    const pnlVal = safeNum(pos.pnl ?? pos.unrealizedPnL, 0);
+                    const pnlPctVal = safeNum(pos.pnlPct, 0);
+                    const isProfit = pnlVal >= 0;
 
                     return (
                       <div
@@ -670,15 +701,15 @@ export default function PositionsTab({
                         </div>
 
                         <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                          ${pos.entryPrice?.toFixed(0)}
+                          ${formatPrice(pos.entryPrice, 0)}
                         </div>
 
                         <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                          ${pos.margin}
+                          ${safeNum(pos.margin, 0)}
                         </div>
 
                         <div className="tabular-nums" style={{ color: '#ef4444', fontSize: '11px' }}>
-                          {pos.liquidationPrice ? `$${pos.liquidationPrice.toFixed(0)}` : '-'}
+                          {Number(pos.liquidationPrice) > 0 ? `$${formatPrice(pos.liquidationPrice, 0)}` : '-'}
                         </div>
 
                         <div className="tabular-nums" style={{
@@ -686,7 +717,7 @@ export default function PositionsTab({
                           fontWeight: 600,
                           color: isProfit ? 'var(--color-long)' : 'var(--color-short)'
                         }}>
-                          {isProfit ? '+' : ''}${pos.pnl?.toFixed(2)} ({isProfit ? '+' : ''}{pos.pnlPct?.toFixed(1)}%)
+                          {isProfit ? '+' : ''}${formatPnl(pnlVal)} ({isProfit ? '+' : ''}{formatPct(pnlPctVal)}%)
                         </div>
 
                         <div style={{ textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -784,7 +815,9 @@ export default function PositionsTab({
 
                 {allPositions.map(({ player, pos, isCurrentPlayer }) => {
                   const isLong = pos.side === 'LONG';
-                  const isProfit = (pos.pnl || 0) >= 0;
+                  const pnlVal = safeNum(pos.pnl ?? pos.unrealizedPnL, 0);
+                  const pnlPctVal = safeNum(pos.pnlPct, 0);
+                  const isProfit = pnlVal >= 0;
 
                   return (
                     <div key={pos.id || `${player.id}_${pos.entryPrice}_${pos.side}`} className="list-row" style={{
@@ -817,15 +850,15 @@ export default function PositionsTab({
                       </div>
 
                       <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                        ${pos.entryPrice?.toFixed(0)}
+                        ${formatPrice(pos.entryPrice, 0)}
                       </div>
 
                       <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                        ${pos.margin}
+                        ${safeNum(pos.margin, 0)}
                       </div>
 
                       <div className="tabular-nums" style={{ color: '#ef4444', fontSize: '11px' }}>
-                        {pos.liquidationPrice ? `$${pos.liquidationPrice.toFixed(0)}` : '-'}
+                        {Number(pos.liquidationPrice) > 0 ? `$${formatPrice(pos.liquidationPrice, 0)}` : '-'}
                       </div>
 
                       <div className="tabular-nums" style={{
@@ -833,7 +866,7 @@ export default function PositionsTab({
                         fontWeight: 600,
                         color: isProfit ? 'var(--color-long)' : 'var(--color-short)'
                       }}>
-                        {isProfit ? '+' : ''}${pos.pnl?.toFixed(2)} ({isProfit ? '+' : ''}{pos.pnlPct?.toFixed(1)}%)
+                        {isProfit ? '+' : ''}${formatPnl(pnlVal)} ({isProfit ? '+' : ''}{formatPct(pnlPctVal)}%)
                       </div>
 
                       <div style={{ textAlign: 'right' }}>

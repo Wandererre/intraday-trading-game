@@ -55,6 +55,7 @@ export default function App() {
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const myPlayerIdRef = useRef(null);
+  const lastLiqFeedIdRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -181,16 +182,18 @@ export default function App() {
                 }
                 return prev;
               });
+
+              if (msg.feed && msg.feed.length > 0) {
+                const latest = msg.feed[0];
+                if (latest.type === 'LIQUIDATION' && latest.id !== lastLiqFeedIdRef.current) {
+                  lastLiqFeedIdRef.current = latest.id;
+                  addToast('LIQUIDATION', `${latest.nickname} liquidated on ${latest.side} ${latest.leverage}x!`);
+                }
+              }
+
               setTickData(prev => {
                 const high = Math.max(prev.high, msg.price);
                 const low = Math.min(prev.low, msg.price);
-
-                if (msg.feed && msg.feed.length > 0) {
-                  const latest = msg.feed[0];
-                  if (latest.type === 'LIQUIDATION' && (!prev.feed[0] || prev.feed[0].id !== latest.id)) {
-                    addToast('LIQUIDATION', `${latest.nickname} liquidated on ${latest.side} ${latest.leverage}x!`);
-                  }
-                }
 
                 let updatedCandles = [...prev.candles];
                 const lastIdx = updatedCandles.length - 1;

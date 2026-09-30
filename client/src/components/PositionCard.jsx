@@ -1,11 +1,31 @@
 import React from 'react';
 
+const safeNum = (v, defaultVal = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : defaultVal;
+};
+
+const formatPrice = (v, dec = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(dec) : '-';
+};
+
+const formatPnl = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+};
+
+const formatPct = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0';
+};
+
 export default function PositionCard({ position, currentPrice = 0, onClose, disabled = false }) {
   if (!position) return null;
 
   const isLong = position.side === 'LONG';
-  const uPnL = position.unrealizedPnL || 0;
-  const pnlPct = position.pnlPct || 0;
+  const uPnL = safeNum(position.unrealizedPnL ?? position.pnl, 0);
+  const pnlPct = safeNum(position.pnlPct, 0);
   const isProfit = uPnL >= 0;
 
   const handleCloseClick = (e) => {
@@ -39,7 +59,7 @@ export default function PositionCard({ position, currentPrice = 0, onClose, disa
             {position.side} {position.leverage}x
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-            Margin: <strong className="tabular-nums" style={{ color: 'var(--text-primary)' }}>${position.margin}</strong>
+            Margin: <strong className="tabular-nums" style={{ color: 'var(--text-primary)' }}>${safeNum(position.margin, 0)}</strong>
           </span>
         </div>
 
@@ -69,7 +89,7 @@ export default function PositionCard({ position, currentPrice = 0, onClose, disa
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Entry / Mark:</span>
           <div className="tabular-nums" style={{ fontWeight: 500, marginTop: '1px' }}>
-            ${position.entryPrice?.toFixed(0)} / ${currentPrice?.toFixed(0)}
+            ${formatPrice(position.entryPrice, 0)} / ${formatPrice(currentPrice, 0)}
           </div>
         </div>
 
@@ -83,12 +103,12 @@ export default function PositionCard({ position, currentPrice = 0, onClose, disa
               color: isProfit ? 'var(--color-long)' : 'var(--color-short)'
             }}
           >
-            {isProfit ? '+' : ''}${uPnL.toFixed(2)} ({isProfit ? '+' : ''}{pnlPct.toFixed(1)}%)
+            {isProfit ? '+' : ''}${formatPnl(uPnL)} ({isProfit ? '+' : ''}{formatPct(pnlPct)}%)
           </div>
         </div>
       </div>
 
-      {position.liquidationPrice > 0 && (
+      {Number(position.liquidationPrice) > 0 && (
         <div style={{
           marginTop: '6px',
           paddingTop: '4px',
@@ -100,7 +120,7 @@ export default function PositionCard({ position, currentPrice = 0, onClose, disa
         }}>
           <span>Est. Liq Price</span>
           <span className="tabular-nums" style={{ color: 'var(--color-short)', fontWeight: 600 }}>
-            ${position.liquidationPrice?.toFixed(2)}
+            ${formatPrice(position.liquidationPrice, 2)}
           </span>
         </div>
       )}
