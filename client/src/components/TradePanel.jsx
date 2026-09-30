@@ -21,6 +21,8 @@ export default function TradePanel({
   const [side, setSide] = useState('LONG'); // 'LONG' | 'SHORT'
   const [amountStr, setAmountStr] = useState('250');
   const [limitPriceStr, setLimitPriceStr] = useState('');
+  const [takeProfitStr, setTakeProfitStr] = useState('');
+  const [stopLossStr, setStopLossStr] = useState('');
   const [leverage, setLeverage] = useState(5);
   const [showBankDetails, setShowBankDetails] = useState(false);
 
@@ -64,23 +66,13 @@ export default function TradePanel({
     }
   }, [balance]);
 
-  const handleSetPercent = (pct) => {
-    if (balance <= 0) return;
-    const val = Math.floor(balance * (pct / 100));
-    setAmountStr(String(Math.max(5, val)));
-  };
-
-  const handleAddAmount = (addVal) => {
-    const current = parseFloat(amountStr) || 0;
-    const nextVal = Math.min(balance, current + addVal);
-    setAmountStr(String(Math.floor(nextVal)));
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     if (disabled || isLiquidated || balance <= 5 || clampedAmount < 5) return;
 
     const sizePct = Math.min(100, Math.max(1, Math.round((clampedAmount / balance) * 100)));
+    const parsedTP = takeProfitStr ? Math.abs(parseFloat(takeProfitStr)) : null;
+    const parsedSL = stopLossStr ? Math.abs(parseFloat(stopLossStr)) : null;
 
     if (orderType === 'LIMIT') {
       const parsedLimitPrice = parseFloat(limitPriceStr);
@@ -91,7 +83,9 @@ export default function TradePanel({
           limitPrice: parsedLimitPrice,
           sizePct,
           leverage: lev,
-          amount: clampedAmount
+          amount: clampedAmount,
+          stopLossPct: parsedSL,
+          takeProfitPct: parsedTP
         });
       }
     } else {
@@ -100,7 +94,9 @@ export default function TradePanel({
           side,
           sizePct,
           leverage: lev,
-          amount: clampedAmount
+          amount: clampedAmount,
+          stopLossPct: parsedSL,
+          takeProfitPct: parsedTP
         });
       }
     }
@@ -113,47 +109,47 @@ export default function TradePanel({
     <div style={{
       position: 'sticky',
       top: '72px',
-      backgroundColor: '#12161f',
-      border: '1px solid #232a38',
-      borderRadius: '10px',
+      backgroundColor: 'var(--bg-surface)',
+      border: '1px solid var(--border-hairline)',
+      borderRadius: 'var(--radius-md, 10px)',
       padding: '16px',
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
       display: 'flex',
       flexDirection: 'column',
       gap: '14px',
       fontFamily: 'Inter, -apple-system, sans-serif',
-      color: '#e2e8f0'
+      color: 'var(--text-primary)'
     }}>
-      {/* Top Header: Market vs Limit Selector & Account Stats */}
+      {/* Top Header: Market vs Limit Selector & Available Cash */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingBottom: '12px',
-        borderBottom: '1px solid #1e2636'
+        borderBottom: '1px solid var(--border-hairline)'
       }}>
-        {/* Polymarket Order Type Selector: MARKET vs LIMIT */}
+        {/* Order Type Selector: MARKET vs LIMIT */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
-          backgroundColor: '#0b0f17',
+          backgroundColor: 'var(--bg-page)',
           padding: '3px',
-          borderRadius: '8px',
-          border: '1px solid #1e2636'
+          borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border-hairline)'
         }}>
           <button
             type="button"
             onClick={() => setOrderType('MARKET')}
             style={{
-              padding: '5px 12px',
-              borderRadius: '6px',
+              padding: '5px 14px',
+              borderRadius: 'var(--radius-sm)',
               fontSize: '11px',
               fontWeight: 700,
               cursor: 'pointer',
-              border: orderType === 'MARKET' ? '1px solid #38bdf8' : 'none',
-              backgroundColor: orderType === 'MARKET' ? 'rgba(56, 189, 248, 0.18)' : 'transparent',
-              color: orderType === 'MARKET' ? '#38bdf8' : '#64748b',
+              border: orderType === 'MARKET' ? '1px solid var(--accent)' : 'none',
+              backgroundColor: orderType === 'MARKET' ? 'var(--accent)' : 'transparent',
+              color: orderType === 'MARKET' ? '#ffffff' : 'var(--text-secondary)',
               transition: 'all 0.15s ease'
             }}
           >
@@ -168,14 +164,14 @@ export default function TradePanel({
               }
             }}
             style={{
-              padding: '5px 12px',
-              borderRadius: '6px',
+              padding: '5px 14px',
+              borderRadius: 'var(--radius-sm)',
               fontSize: '11px',
               fontWeight: 700,
               cursor: 'pointer',
               border: orderType === 'LIMIT' ? '1px solid #f59e0b' : 'none',
-              backgroundColor: orderType === 'LIMIT' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
-              color: orderType === 'LIMIT' ? '#f59e0b' : '#64748b',
+              backgroundColor: orderType === 'LIMIT' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
+              color: orderType === 'LIMIT' ? '#f59e0b' : 'var(--text-secondary)',
               transition: 'all 0.15s ease'
             }}
           >
@@ -185,10 +181,10 @@ export default function TradePanel({
 
         {/* Live Cash Readout */}
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Cash Available
           </div>
-          <div className="tabular-nums" style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc' }}>
+          <div className="tabular-nums" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
             ${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
@@ -200,19 +196,19 @@ export default function TradePanel({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '8px 12px',
-        backgroundColor: '#0c1017',
-        borderRadius: '6px',
-        border: '1px solid #1a2230',
+        backgroundColor: 'var(--bg-page)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border-hairline)',
         fontSize: '11px'
       }}>
-        <span style={{ color: '#94a3b8' }}>Portfolio Equity:</span>
+        <span style={{ color: 'var(--text-secondary)' }}>Portfolio Equity:</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <strong className="tabular-nums" style={{ color: '#f1f5f9', fontSize: '12px' }}>
+          <strong className="tabular-nums" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
             ${Math.round(equity).toLocaleString()}
           </strong>
           <span className="tabular-nums" style={{
             fontWeight: 700,
-            color: isProfit ? '#10b981' : '#ef4444'
+            color: isProfit ? 'var(--color-long)' : 'var(--color-short)'
           }}>
             {isProfit ? '+' : ''}${Math.round(delta10k).toLocaleString()} ({isProfit ? '+' : ''}{deltaPct.toFixed(1)}%)
           </span>
@@ -231,75 +227,67 @@ export default function TradePanel({
           <strong style={{ color: '#ef4444', display: 'block', fontSize: '13px', marginBottom: '4px' }}>
             POSITIONS LIQUIDATED
           </strong>
-          <span style={{ color: '#94a3b8' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>
             Fresh $10,000 cash balance will be granted for next round!
           </span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Polymarket & Kalshi Outcome Selector Cards */}
+          {/* Outcome Selector: BUY LONG vs BUY SHORT */}
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Choose Outcome
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {/* Buy Long / Up Card */}
+              {/* Buy Long */}
               <button
                 type="button"
                 onClick={() => setSide('LONG')}
                 style={{
                   padding: '12px 10px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer',
-                  border: isLong ? '2px solid #10b981' : '1px solid #2d3748',
-                  backgroundColor: isLong ? 'rgba(16, 185, 129, 0.16)' : '#161c27',
-                  color: isLong ? '#ffffff' : '#94a3b8',
+                  border: isLong ? '2px solid var(--color-long)' : '1px solid var(--border-hairline)',
+                  backgroundColor: isLong ? 'var(--color-long-bg)' : 'var(--bg-page)',
+                  color: isLong ? 'var(--color-long)' : 'var(--text-secondary)',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '4px',
-                  transition: 'all 0.15s ease',
-                  boxShadow: isLong ? '0 0 12px rgba(16, 185, 129, 0.25)' : 'none'
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span style={{ fontSize: '14px', color: '#10b981' }}>▲</span>
-                  <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.02em', color: isLong ? '#10b981' : '#cbd5e1' }}>
-                    {orderType === 'LIMIT' ? 'BUY LONG LIMIT' : 'BUY LONG'}
-                  </span>
-                </div>
-                <span style={{ fontSize: '10px', color: isLong ? '#86efac' : '#64748b', fontWeight: 500 }}>
-                  Bet on Rise ↗
+                <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.02em' }}>
+                  {orderType === 'LIMIT' ? 'BUY LONG LIMIT' : 'BUY LONG'}
+                </span>
+                <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                  Bet on Rise
                 </span>
               </button>
 
-              {/* Buy Short / Down Card */}
+              {/* Buy Short */}
               <button
                 type="button"
                 onClick={() => setSide('SHORT')}
                 style={{
                   padding: '12px 10px',
-                  borderRadius: '8px',
+                  borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer',
-                  border: !isLong ? '2px solid #ef4444' : '1px solid #2d3748',
-                  backgroundColor: !isLong ? 'rgba(239, 68, 68, 0.16)' : '#161c27',
-                  color: !isLong ? '#ffffff' : '#94a3b8',
+                  border: !isLong ? '2px solid var(--color-short)' : '1px solid var(--border-hairline)',
+                  backgroundColor: !isLong ? 'var(--color-short-bg)' : 'var(--bg-page)',
+                  color: !isLong ? 'var(--color-short)' : 'var(--text-secondary)',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '4px',
-                  transition: 'all 0.15s ease',
-                  boxShadow: !isLong ? '0 0 12px rgba(239, 68, 68, 0.25)' : 'none'
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span style={{ fontSize: '14px', color: '#ef4444' }}>▼</span>
-                  <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.02em', color: !isLong ? '#ef4444' : '#cbd5e1' }}>
-                    {orderType === 'LIMIT' ? 'BUY SHORT LIMIT' : 'BUY SHORT'}
-                  </span>
-                </div>
-                <span style={{ fontSize: '10px', color: !isLong ? '#fca5a5' : '#64748b', fontWeight: 500 }}>
-                  Bet on Drop ↘
+                <span style={{ fontWeight: 800, fontSize: '13px', letterSpacing: '0.02em' }}>
+                  {orderType === 'LIMIT' ? 'BUY SHORT LIMIT' : 'BUY SHORT'}
+                </span>
+                <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                  Bet on Drop
                 </span>
               </button>
             </div>
@@ -315,7 +303,7 @@ export default function TradePanel({
                 marginBottom: '6px'
               }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Target Limit Price
+                  Target Limit Price ($)
                 </span>
                 <button
                   type="button"
@@ -323,7 +311,7 @@ export default function TradePanel({
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#38bdf8',
+                    color: 'var(--accent)',
                     fontSize: '11px',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -337,12 +325,12 @@ export default function TradePanel({
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                backgroundColor: '#0a0d14',
+                backgroundColor: 'var(--bg-page)',
                 border: '1px solid #f59e0b',
-                borderRadius: '8px',
+                borderRadius: 'var(--radius-sm)',
                 padding: '8px 14px'
               }}>
-                <span style={{ fontSize: '20px', fontWeight: 700, color: '#f59e0b', marginRight: '6px', userSelect: 'none' }}>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b', marginRight: '6px', userSelect: 'none' }}>
                   $
                 </span>
                 <input
@@ -350,61 +338,33 @@ export default function TradePanel({
                   step="1"
                   value={limitPriceStr}
                   onChange={(e) => setLimitPriceStr(e.target.value)}
-                  placeholder={String(Math.round(currentPrice))}
+                  placeholder="e.g. 43000"
                   className="tabular-nums"
                   style={{
                     flex: 1,
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
-                    color: '#ffffff',
-                    fontSize: '20px',
-                    fontWeight: 800,
+                    color: 'var(--text-primary)',
+                    fontSize: '18px',
+                    fontWeight: 700,
                     fontFamily: 'inherit',
                     width: '100%'
                   }}
                 />
-                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>USD</span>
               </div>
 
-              {/* Quick Nudge Pills (-$50, -$10, +$10, +$50) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-                {[-50, -10, 10, 50].map((nudge) => (
-                  <button
-                    key={nudge}
-                    type="button"
-                    onClick={() => {
-                      const cur = parseFloat(limitPriceStr) || currentPrice || 43500;
-                      setLimitPriceStr(String(Math.max(1, Math.round(cur + nudge))));
-                    }}
-                    style={{
-                      padding: '4px 0',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      borderRadius: '5px',
-                      border: '1px solid #2d3748',
-                      backgroundColor: '#161c27',
-                      color: '#cbd5e1',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {nudge > 0 ? `+${nudge}` : nudge}
-                  </button>
-                ))}
-              </div>
-
-              {/* Helper trigger explanation */}
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '5px', lineHeight: 1.4 }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {isLong ? (
-                  <span><strong>Buy Long Limit:</strong> Will trigger & fill if price drops to or below <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
+                  <span><strong>Buy Long Limit:</strong> Triggers if price drops to or below <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
                 ) : (
-                  <span><strong>Buy Short Limit:</strong> Will trigger & fill if price rises to or above <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
+                  <span><strong>Buy Short Limit:</strong> Triggers if price rises to or above <strong>${parseFloat(limitPriceStr)?.toLocaleString() || '---'}</strong></span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Amount Input with Currency Symbol & Quick Chips */}
+          {/* Simple Amount Input: Only dollar values entered by user */}
           <div>
             <div style={{
               display: 'flex',
@@ -412,37 +372,23 @@ export default function TradePanel({
               alignItems: 'center',
               marginBottom: '6px'
             }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Order Amount
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Order Amount ($)
               </span>
-              <button
-                type="button"
-                onClick={() => handleSetPercent(100)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#38bdf8',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                Max (${Math.floor(balance).toLocaleString()})
-              </button>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Max: ${Math.floor(balance).toLocaleString()}
+              </span>
             </div>
 
-            {/* Big Polymarket-Style Amount Input */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              backgroundColor: '#0a0d14',
-              border: '1px solid #2d3748',
-              borderRadius: '8px',
-              padding: '8px 14px',
-              transition: 'border-color 0.15s'
+              backgroundColor: 'var(--bg-page)',
+              border: '1px solid var(--border-hairline)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px'
             }}>
-              <span style={{ fontSize: '22px', fontWeight: 700, color: '#64748b', marginRight: '6px', userSelect: 'none' }}>
+              <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-muted)', marginRight: '6px', userSelect: 'none' }}>
                 $
               </span>
               <input
@@ -452,93 +398,25 @@ export default function TradePanel({
                 step="5"
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0"
+                placeholder="100"
                 className="tabular-nums"
                 style={{
                   flex: 1,
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  color: '#ffffff',
-                  fontSize: '22px',
-                  fontWeight: 800,
+                  color: 'var(--text-primary)',
+                  fontSize: '20px',
+                  fontWeight: 700,
                   fontFamily: 'inherit',
                   width: '100%'
                 }}
               />
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>USD</span>
-            </div>
-
-            {/* Quick Percentage Presets (25%, 50%, 75%, MAX) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '8px' }}>
-              {[25, 50, 75, 100].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  onClick={() => handleSetPercent(pct)}
-                  style={{
-                    padding: '6px 0',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: '6px',
-                    border: '1px solid #2d3748',
-                    backgroundColor: '#161c27',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#1f2838';
-                    e.currentTarget.style.color = '#ffffff';
-                    e.currentTarget.style.borderColor = '#475569';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#161c27';
-                    e.currentTarget.style.color = '#94a3b8';
-                    e.currentTarget.style.borderColor = '#2d3748';
-                  }}
-                >
-                  {pct === 100 ? 'MAX' : `${pct}%`}
-                </button>
-              ))}
-            </div>
-
-            {/* Quick Cash Presets (+$50, +$100, +$250, +$500) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
-              {[50, 100, 250, 500].map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => handleAddAmount(amt)}
-                  style={{
-                    padding: '5px 0',
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    borderRadius: '6px',
-                    border: '1px solid #242c3d',
-                    backgroundColor: '#0f141d',
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#192231';
-                    e.currentTarget.style.color = '#38bdf8';
-                    e.currentTarget.style.borderColor = '#38bdf8';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0f141d';
-                    e.currentTarget.style.color = '#64748b';
-                    e.currentTarget.style.borderColor = '#242c3d';
-                  }}
-                >
-                  +${amt}
-                </button>
-              ))}
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>USD</span>
             </div>
           </div>
 
-          {/* Leverage Multiplier Section (Polymarket / Perps Pills) */}
+          {/* Simple Leverage Slider: Only slider */}
           <div>
             <div style={{
               display: 'flex',
@@ -546,60 +424,138 @@ export default function TradePanel({
               alignItems: 'center',
               marginBottom: '6px'
             }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Leverage Multiplier
               </span>
               <span className="tabular-nums" style={{
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: 700,
-                color: lev >= 10 ? '#ef4444' : '#38bdf8'
+                color: lev >= 10 ? 'var(--color-short)' : 'var(--accent)'
               }}>
-                {lev}x ({lev}x Payout Power)
+                {lev}x Leverage
               </span>
             </div>
 
-            {/* Segmented Leverage Pills */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-              {[1, 2, 5, 10, 20].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setLeverage(m)}
-                  style={{
-                    padding: '6px 0',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    border: lev === m ? '1px solid #38bdf8' : '1px solid #2d3748',
-                    backgroundColor: lev === m ? 'rgba(56, 189, 248, 0.18)' : '#161c27',
-                    color: lev === m ? '#38bdf8' : '#94a3b8',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {m}x
-                </button>
-              ))}
-            </div>
-
-            {/* Fine-tune Slider */}
-            <div style={{ marginTop: '8px' }}>
-              <input
-                type="range"
-                min="1"
-                max={maxLeverage}
-                value={lev}
-                onChange={(e) => setLeverage(parseInt(e.target.value, 10))}
-                style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }}
-              />
+            <input
+              type="range"
+              min="1"
+              max={maxLeverage}
+              value={lev}
+              onChange={(e) => setLeverage(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              <span>1x</span>
+              <span>5x</span>
+              <span>10x</span>
+              <span>{maxLeverage}x</span>
             </div>
           </div>
 
-          {/* Order Details / Fill Receipt (Polymarket & Kalshi Breakdown) */}
+          {/* Take Profit (TP) & Stop Loss (SL) Inputs for Market Orders */}
           <div style={{
-            backgroundColor: '#0c1017',
-            borderRadius: '8px',
-            border: '1px solid #1e2636',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '10px'
+          }}>
+            {/* Take Profit */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--color-long)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}>
+                Take Profit (%)
+              </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-page)',
+                border: '1px solid var(--border-hairline)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px'
+              }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  step="1"
+                  placeholder="e.g. 10"
+                  value={takeProfitStr}
+                  onChange={(e) => setTakeProfitStr(e.target.value)}
+                  className="tabular-nums"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    width: '100%'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: 'var(--color-long)', fontWeight: 700 }}>%</span>
+              </div>
+            </div>
+
+            {/* Stop Loss */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--color-short)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}>
+                Stop Loss (%)
+              </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-page)',
+                border: '1px solid var(--border-hairline)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px'
+              }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="95"
+                  step="1"
+                  placeholder="e.g. 5"
+                  value={stopLossStr}
+                  onChange={(e) => setStopLossStr(e.target.value)}
+                  className="tabular-nums"
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    width: '100%'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: 'var(--color-short)', fontWeight: 700 }}>%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Order Details / Fill Receipt */}
+          <div style={{
+            backgroundColor: 'var(--bg-page)',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border-hairline)',
             padding: '10px 12px',
             fontSize: '11px',
             display: 'flex',
@@ -607,30 +563,30 @@ export default function TradePanel({
             gap: '6px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#94a3b8' }}>{orderType === 'LIMIT' ? 'Target Limit Price' : 'Market Execution Price'}</span>
-              <span className="tabular-nums" style={{ fontWeight: 600, color: orderType === 'LIMIT' ? '#f59e0b' : '#f1f5f9' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Execution Price</span>
+              <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                 ${targetPrice > 0 ? targetPrice.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '---'}
               </span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#94a3b8' }}>Total Position Size (Notional)</span>
-              <span className="tabular-nums" style={{ fontWeight: 600, color: '#f1f5f9' }}>
-                ${notional.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span style={{ color: 'var(--text-secondary)' }}>Position Power</span>
+              <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                ${notional.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({lev}x)
               </span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: '#94a3b8' }}>Est. Liquidation Price</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Est. Liquidation Price</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="tabular-nums" style={{ color: '#ef4444', fontWeight: 700 }}>
+                <span className="tabular-nums" style={{ color: 'var(--color-short)', fontWeight: 700 }}>
                   ${estLiqPrice > 0 ? estLiqPrice.toFixed(1) : '---'}
                 </span>
                 <span style={{
                   fontSize: '9px',
                   fontWeight: 700,
-                  backgroundColor: 'rgba(239, 68, 68, 0.18)',
-                  color: '#ef4444',
+                  backgroundColor: 'var(--color-short-bg)',
+                  color: 'var(--color-short)',
                   padding: '1px 4px',
                   borderRadius: '3px'
                 }}>
@@ -639,15 +595,25 @@ export default function TradePanel({
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid #1a2230' }}>
-              <span style={{ color: '#64748b' }}>Taker Fee (0.05%)</span>
-              <span className="tabular-nums" style={{ color: '#64748b' }}>
+            {(takeProfitStr || stopLossStr) && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid var(--border-hairline)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Exit Orders</span>
+                <span style={{ fontSize: '10px', fontWeight: 600 }}>
+                  {takeProfitStr && <span style={{ color: 'var(--color-long)', marginRight: '6px' }}>TP: +{takeProfitStr}%</span>}
+                  {stopLossStr && <span style={{ color: 'var(--color-short)' }}>SL: -{stopLossStr}%</span>}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid var(--border-hairline)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taker Fee (0.05%)</span>
+              <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
                 ${estFee.toFixed(2)}
               </span>
             </div>
           </div>
 
-          {/* Big Polymarket / Kalshi Full-Width Call-to-Action Button */}
+          {/* Full-Width Action Button */}
           <button
             type="submit"
             disabled={!isOrderValid}
@@ -657,16 +623,13 @@ export default function TradePanel({
               fontWeight: 800,
               letterSpacing: '0.04em',
               width: '100%',
-              borderRadius: '8px',
+              borderRadius: 'var(--radius-sm)',
               border: 'none',
               cursor: isOrderValid ? 'pointer' : 'not-allowed',
               backgroundColor: !isOrderValid
-                ? '#1e2636'
-                : (isLong ? '#10b981' : '#ef4444'),
-              color: !isOrderValid ? '#64748b' : '#ffffff',
-              boxShadow: isOrderValid
-                ? (isLong ? '0 4px 16px rgba(16, 185, 129, 0.35)' : '0 4px 16px rgba(239, 68, 68, 0.35)')
-                : 'none',
+                ? 'var(--border-hairline)'
+                : (isLong ? 'var(--color-long)' : 'var(--color-short)'),
+              color: !isOrderValid ? 'var(--text-muted)' : '#ffffff',
               transition: 'all 0.15s ease',
               display: 'flex',
               alignItems: 'center',
@@ -694,9 +657,9 @@ export default function TradePanel({
       {/* Open Limit Orders List in TradePanel */}
       {openLimitOrders && openLimitOrders.length > 0 && (
         <div style={{
-          backgroundColor: '#0c1017',
-          border: '1px solid #334155',
-          borderRadius: '8px',
+          backgroundColor: 'var(--bg-page)',
+          border: '1px solid var(--border-hairline)',
+          borderRadius: 'var(--radius-sm)',
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
@@ -721,31 +684,31 @@ export default function TradePanel({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '6px 8px',
-                  backgroundColor: '#161c27',
-                  borderRadius: '6px',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: 'var(--radius-sm)',
                   fontSize: '11px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{
                       fontWeight: 700,
                       padding: '1px 5px',
-                      borderRadius: '4px',
-                      backgroundColor: isOrdLong ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: isOrdLong ? '#10b981' : '#ef4444',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: isOrdLong ? 'var(--color-long-bg)' : 'var(--color-short-bg)',
+                      color: isOrdLong ? 'var(--color-long)' : 'var(--color-short)',
                       fontSize: '10px'
                     }}>
                       {ord.side} {ord.leverage}x
                     </span>
-                    <span className="tabular-nums" style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                    <span className="tabular-nums" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                       ${ord.limitPrice?.toFixed(0)}
                     </span>
-                    <span style={{ fontSize: '10px', color: '#64748b' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       ({distPct > 0 ? `+${distPct}` : distPct}%)
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="tabular-nums" style={{ color: '#94a3b8' }}>
+                    <span className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                       ${ord.margin}
                     </span>
                     <button
@@ -755,10 +718,10 @@ export default function TradePanel({
                         padding: '2px 8px',
                         fontSize: '10px',
                         fontWeight: 700,
-                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                        border: '1px solid #ef4444',
-                        color: '#ff6b6b',
-                        borderRadius: '4px',
+                        backgroundColor: 'var(--color-short-bg)',
+                        border: '1px solid var(--color-short)',
+                        color: 'var(--color-short)',
+                        borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer'
                       }}
                     >
@@ -772,11 +735,11 @@ export default function TradePanel({
         </div>
       )}
 
-      {/* Degenerate Loan Bank Section (Emergency Liquidity) */}
+      {/* Loan Bank Section (Emergency Liquidity) */}
       <div style={{
-        backgroundColor: '#0c1017',
-        border: '1px solid #1e2636',
-        borderRadius: '8px',
+        backgroundColor: 'var(--bg-page)',
+        border: '1px solid var(--border-hairline)',
+        borderRadius: 'var(--radius-sm)',
         overflow: 'hidden'
       }}>
         {/* Accordion Header */}
@@ -792,7 +755,7 @@ export default function TradePanel({
             alignItems: 'center',
             justifyContent: 'space-between',
             cursor: 'pointer',
-            color: '#cbd5e1',
+            color: 'var(--text-secondary)',
             fontSize: '11px',
             fontWeight: 700
           }}
@@ -802,94 +765,98 @@ export default function TradePanel({
             {bankDebt > 0 && (
               <span style={{
                 fontSize: '9px',
-                backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                color: '#ef4444',
+                backgroundColor: 'var(--color-short-bg)',
+                color: 'var(--color-short)',
                 padding: '1px 5px',
-                borderRadius: '4px',
+                borderRadius: 'var(--radius-sm)',
                 fontWeight: 800
               }}>
                 DEBT ACTIVE
               </span>
             )}
           </div>
-          <span style={{ fontSize: '10px', color: '#64748b' }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
             {showBankDetails ? '▲' : '▼'}
           </span>
         </button>
 
-        {/* Bank Actions & Details */}
-        <div style={{
-          padding: showBankDetails || bankDebt > 0 ? '0 12px 12px 12px' : '0 12px 10px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '11px' }}>
-            <span style={{ color: '#64748b' }}>Outstanding Debt:</span>
-            <span className="tabular-nums" style={{ fontWeight: 700, color: bankDebt > 0 ? '#ef4444' : '#94a3b8' }}>
-              ${bankDebt?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
+        {/* Collapsible Content */}
+        {showBankDetails && (
+          <div style={{
+            padding: '12px',
+            borderTop: '1px solid var(--border-hairline)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            fontSize: '11px'
+          }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '6px',
+              textAlign: 'center'
+            }}>
+              <div style={{ backgroundColor: 'var(--bg-surface)', padding: '6px', borderRadius: 'var(--radius-sm)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', display: 'block' }}>Active Debt</span>
+                <strong className="tabular-nums" style={{ color: bankDebt > 0 ? 'var(--color-short)' : 'var(--text-primary)', fontSize: '12px' }}>
+                  ${Math.round(bankDebt).toLocaleString()}
+                </strong>
+              </div>
 
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => onBankBorrow && onBankBorrow(1000)}
-              disabled={disabled || isLiquidated}
-              style={{
-                flex: 1,
-                padding: '6px 0',
-                fontSize: '11px',
-                fontWeight: 700,
-                backgroundColor: '#161c27',
-                border: '1px solid #2d3748',
-                borderRadius: '6px',
-                color: '#cbd5e1',
-                cursor: 'pointer'
-              }}
-            >
-              +Borrow $1k
-            </button>
-            <button
-              type="button"
-              onClick={() => onBankBorrow && onBankBorrow(2500)}
-              disabled={disabled || isLiquidated}
-              style={{
-                flex: 1,
-                padding: '6px 0',
-                fontSize: '11px',
-                fontWeight: 700,
-                backgroundColor: '#161c27',
-                border: '1px solid #2d3748',
-                borderRadius: '6px',
-                color: '#cbd5e1',
-                cursor: 'pointer'
-              }}
-            >
-              +Borrow $2.5k
-            </button>
-            {bankDebt > 0 && (
+              <div style={{ backgroundColor: 'var(--bg-surface)', padding: '6px', borderRadius: 'var(--radius-sm)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', display: 'block' }}>Interest/Sec</span>
+                <strong className="tabular-nums" style={{ color: '#f59e0b', fontSize: '12px' }}>
+                  {bankRatePct}%
+                </strong>
+              </div>
+
+              <div style={{ backgroundColor: 'var(--bg-surface)', padding: '6px', borderRadius: 'var(--radius-sm)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '10px', display: 'block' }}>Loss Penalty</span>
+                <strong className="tabular-nums" style={{ color: losingTrades > 0 ? 'var(--color-short)' : 'var(--text-muted)', fontSize: '12px' }}>
+                  +{losingTrades * 5}%
+                </strong>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <button
                 type="button"
-                onClick={() => onBankRepay && onBankRepay(bankDebt)}
-                disabled={disabled || balance <= 0}
+                onClick={() => onBankBorrow && onBankBorrow(1000)}
+                disabled={disabled || isLiquidated || bankDebt >= 10000}
                 style={{
-                  flex: 1,
-                  padding: '6px 0',
+                  padding: '7px 0',
                   fontSize: '11px',
-                  fontWeight: 800,
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                  border: '1px solid #10b981',
-                  borderRadius: '6px',
-                  color: '#10b981',
-                  cursor: 'pointer'
+                  fontWeight: 700,
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-hairline)',
+                  color: 'var(--accent)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: (disabled || isLiquidated || bankDebt >= 10000) ? 'not-allowed' : 'pointer'
                 }}
               >
-                Repay All
+                BORROW $1,000
               </button>
-            )}
+
+              <button
+                type="button"
+                onClick={() => onBankRepay && onBankRepay(1000)}
+                disabled={disabled || bankDebt <= 0 || balance < 10}
+                style={{
+                  padding: '7px 0',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-hairline)',
+                  color: 'var(--color-long)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: (disabled || bankDebt <= 0 || balance < 10) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                REPAY $1,000
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

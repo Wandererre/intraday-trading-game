@@ -259,6 +259,12 @@ export default function PositionsTab({
                           }}>
                             {pos.side} {pos.leverage}x
                           </span>
+                          {(pos.takeProfitPct || pos.stopLossPct) && (
+                            <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 600 }}>
+                              {pos.takeProfitPct && <span style={{ color: 'var(--color-long)', marginRight: '4px' }}>TP: +{pos.takeProfitPct}%</span>}
+                              {pos.stopLossPct && <span style={{ color: 'var(--color-short)' }}>SL: -{pos.stopLossPct}%</span>}
+                            </div>
+                          )}
                         </div>
 
                         <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>
@@ -375,6 +381,12 @@ export default function PositionsTab({
                         }}>
                           {pos.side} {pos.leverage}x
                         </span>
+                        {(pos.takeProfitPct || pos.stopLossPct) && (
+                          <div style={{ fontSize: '9px', marginTop: '2px', fontWeight: 600 }}>
+                            {pos.takeProfitPct && <span style={{ color: 'var(--color-long)', marginRight: '4px' }}>TP: +{pos.takeProfitPct}%</span>}
+                            {pos.stopLossPct && <span style={{ color: 'var(--color-short)' }}>SL: -{pos.stopLossPct}%</span>}
+                          </div>
+                        )}
                       </div>
 
                       <div className="tabular-nums" style={{ color: 'var(--text-secondary)' }}>

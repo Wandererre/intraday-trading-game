@@ -149,7 +149,9 @@ export default function App() {
                 ...prev,
                 state: 'ROUND_ACTIVE',
                 currentRoundIndex: msg.roundIndex !== undefined ? msg.roundIndex : prev.currentRoundIndex,
-                totalRounds: msg.totalRounds || prev.totalRounds
+                totalRounds: msg.totalRounds || prev.totalRounds,
+                betweenRoundCountdown: 0,
+                roundSummary: null
               }));
               setTickData(prev => ({
                 ...prev,
@@ -168,11 +170,13 @@ export default function App() {
 
             case 'TICK':
               setGame(prev => {
-                if (prev.state === 'LOBBY') {
+                if (prev.state !== 'ROUND_ACTIVE' && prev.state !== 'FINAL_RESULTS') {
                   return {
                     ...prev,
                     state: 'ROUND_ACTIVE',
-                    currentRoundIndex: msg.roundIndex !== undefined ? msg.roundIndex : prev.currentRoundIndex
+                    currentRoundIndex: msg.roundIndex !== undefined ? msg.roundIndex : prev.currentRoundIndex,
+                    betweenRoundCountdown: 0,
+                    roundSummary: null
                   };
                 }
                 return prev;
@@ -443,20 +447,22 @@ export default function App() {
     }
   };
 
-  const handleOrder = ({ side, sizePct, leverage, amount }) => {
+  const handleOrder = ({ side, sizePct, leverage, amount, stopLossPct, takeProfitPct }) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'PLACE_ORDER',
         side,
         sizePct,
         leverage,
-        amount
+        amount,
+        stopLossPct,
+        takeProfitPct
       }));
       setMobileTradeOpen(false);
     }
   };
 
-  const handleLimitOrder = ({ side, limitPrice, sizePct, leverage, amount }) => {
+  const handleLimitOrder = ({ side, limitPrice, sizePct, leverage, amount, stopLossPct, takeProfitPct }) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
         type: 'PLACE_LIMIT_ORDER',
@@ -464,7 +470,9 @@ export default function App() {
         limitPrice,
         sizePct,
         leverage,
-        amount
+        amount,
+        stopLossPct,
+        takeProfitPct
       }));
       setMobileTradeOpen(false);
     }

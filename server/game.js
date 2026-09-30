@@ -92,6 +92,11 @@ export class GameManager {
       this.hostPlayerId = playerId;
     }
 
+    if (this.hostDisconnectTimer && this.hostPlayerId === playerId) {
+      clearTimeout(this.hostDisconnectTimer);
+      this.hostDisconnectTimer = null;
+    }
+
     this.clientSockets.set(playerId, ws);
     this.broadcastState();
     return playerId;
@@ -159,9 +164,8 @@ export class GameManager {
   }
 
   startGame() {
-    if (this.state !== GAME_STATES.LOBBY) {
-      this.broadcastState();
-      return false;
+    if (this.state === GAME_STATES.FINAL_RESULTS) {
+      this.restartGame();
     }
     if (this.players.size === 0) return false;
 
@@ -171,8 +175,16 @@ export class GameManager {
   }
 
   startRound(roundIndex) {
-    if (this.tickTimer) clearInterval(this.tickTimer);
-    if (this.betweenRoundTimer) clearInterval(this.betweenRoundTimer);
+    if (this.tickTimer) {
+      clearInterval(this.tickTimer);
+      this.tickTimer = null;
+    }
+    if (this.betweenRoundTimer) {
+      clearInterval(this.betweenRoundTimer);
+      this.betweenRoundTimer = null;
+    }
+    this.betweenRoundCountdown = 0;
+    this.roundSummary = null;
 
     this.currentRoundIndex = roundIndex;
     const duration = this.config.roundDurationSec || 180;
@@ -306,8 +318,12 @@ export class GameManager {
   }
 
   forceNextRound() {
-    if (this.state !== GAME_STATES.ROUND_ENDED) return false;
-    if (this.betweenRoundTimer) clearInterval(this.betweenRoundTimer);
+    if (this.state !== GAME_STATES.ROUND_ENDED && this.state !== GAME_STATES.ROUND_ACTIVE) return false;
+    if (this.betweenRoundTimer) {
+      clearInterval(this.betweenRoundTimer);
+      this.betweenRoundTimer = null;
+    }
+    this.betweenRoundCountdown = 0;
     this.startRound(this.currentRoundIndex + 1);
     return true;
   }
@@ -414,9 +430,9 @@ export class GameManager {
     return this.executeImmediateClose(playerId);
   }
 
-  executeImmediateOrder(playerId, side, sizePct, leverage, amount = null) {
+  executeImmediateOrder(playerId, side, sizePct, leverage, amount = null, stopLossPct = null, takeProfitPct = null) {
     if (this.state !== GAME_STATES.ROUND_ACTIVE) return false;
-    const pos = this.engine.openPosition(playerId, side, sizePct, leverage, 'manual', amount);
+    const pos = this.engine.openPosition(playerId, side, sizePct, leverage, 'manual', amount, stopLossPct, takeProfitPct);
     this.broadcastState();
     return !!pos;
   }
@@ -429,7 +445,9 @@ export class GameManager {
       data.limitPrice,
       data.amount,
       data.sizePct,
-      data.leverage
+      data.leverage,
+      data.stopLossPct,
+      data.takeProfitPct
     );
     this.broadcastState();
     return res;

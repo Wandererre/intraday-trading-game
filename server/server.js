@@ -301,7 +301,15 @@ wss.on('connection', (ws) => {
         case 'PLACE_ORDER': {
           if (boundPlayerId) {
             // Instant execution: zero lag
-            game.executeImmediateOrder(boundPlayerId, data.side, data.sizePct, data.leverage, data.amount);
+            game.executeImmediateOrder(
+              boundPlayerId,
+              data.side,
+              data.sizePct,
+              data.leverage,
+              data.amount,
+              data.stopLossPct,
+              data.takeProfitPct
+            );
           }
           break;
         }
@@ -411,13 +419,23 @@ wss.on('connection', (ws) => {
       const game = roomManager.getRoom(boundRoomCode);
       if (game) {
         if (game.hostPlayerId === boundPlayerId) {
-          console.log(`[Host Disconnected] Host ${boundPlayerId} disconnected/refreshed in room ${boundRoomCode}. Deleting room and kicking all players.`);
-          game.broadcast({
-            type: 'ROOM_CLOSED',
-            roomCode: boundRoomCode,
-            message: 'Host left or refreshed. The room has been deleted.'
-          });
-          roomManager.deleteRoom(boundRoomCode);
+          console.log(`[Host Disconnected] Host ${boundPlayerId} socket closed in room ${boundRoomCode}. Starting 8s reconnection grace period...`);
+          game.handlePlayerDisconnect(boundPlayerId);
+
+          if (game.hostDisconnectTimer) clearTimeout(game.hostDisconnectTimer);
+          game.hostDisconnectTimer = setTimeout(() => {
+            const currentHostSocket = game.clientSockets.get(boundPlayerId);
+            const isReconnected = currentHostSocket && currentHostSocket.readyState === 1;
+            if (!isReconnected && game.hostPlayerId === boundPlayerId && game.getActiveSocketCount() === 0) {
+              console.log(`[Host Disconnected] Host ${boundPlayerId} did not reconnect within grace period. Deleting room.`);
+              game.broadcast({
+                type: 'ROOM_CLOSED',
+                roomCode: boundRoomCode,
+                message: 'Host left the room. Room closed.'
+              });
+              roomManager.deleteRoom(boundRoomCode);
+            }
+          }, 8000);
         } else {
           game.handlePlayerDisconnect(boundPlayerId);
           if (game.getActiveSocketCount() === 0) {

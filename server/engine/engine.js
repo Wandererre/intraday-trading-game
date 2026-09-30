@@ -217,7 +217,7 @@ export class TradingEngine {
     }
   }
 
-  openPosition(playerId, side, sizePct, leverage, source = 'manual', amount = null) {
+  openPosition(playerId, side, sizePct, leverage, source = 'manual', amount = null, stopLossPct = null, takeProfitPct = null) {
     const player = this.players.get(playerId);
     if (!player || player.isLiquidated) return null;
 
@@ -279,6 +279,8 @@ export class TradingEngine {
       leverage: lev,
       margin: actualMargin,
       liquidationPrice: Math.round(liqPrice * 100) / 100,
+      stopLossPct: stopLossPct ? Math.abs(Number(stopLossPct)) : null,
+      takeProfitPct: takeProfitPct ? Math.abs(Number(takeProfitPct)) : null,
       openTick: this.currentTick,
       source
     };
@@ -310,7 +312,7 @@ export class TradingEngine {
     return newPosition;
   }
 
-  placeLimitOrder(playerId, side, limitPrice, amount = null, sizePct = 25, leverage = 1) {
+  placeLimitOrder(playerId, side, limitPrice, amount = null, sizePct = 25, leverage = 1, stopLossPct = null, takeProfitPct = null) {
     const player = this.players.get(playerId);
     if (!player || player.isLiquidated) return null;
 
@@ -353,6 +355,8 @@ export class TradingEngine {
       reservedMargin: Math.round(reservedMargin * 100) / 100,
       leverage: lev,
       notional: Math.round(notional * 100) / 100,
+      stopLossPct: stopLossPct ? Math.abs(Number(stopLossPct)) : null,
+      takeProfitPct: takeProfitPct ? Math.abs(Number(takeProfitPct)) : null,
       status: 'PENDING',
       createdAtTick: this.currentTick,
       createdAtPrice: this.getCurrentPrice()
@@ -435,6 +439,8 @@ export class TradingEngine {
       leverage: lev,
       margin: order.margin,
       liquidationPrice: Math.round(liqPrice * 100) / 100,
+      stopLossPct: order.stopLossPct || null,
+      takeProfitPct: order.takeProfitPct || null,
       openTick: this.currentTick,
       source: 'limit_order'
     };
@@ -773,11 +779,11 @@ export class TradingEngine {
 
     // 3. Process manual player intents
     for (const intent of intents) {
-      const { playerId, type, side, sizePct, leverage, positionId, amount } = intent;
+      const { playerId, type, side, sizePct, leverage, positionId, amount, stopLossPct, takeProfitPct } = intent;
       if (type === ORDER_TYPES.MARKET_BUY) {
-        this.openPosition(playerId, SIDES.LONG, sizePct, leverage, 'manual');
+        this.openPosition(playerId, SIDES.LONG, sizePct, leverage, 'manual', amount, stopLossPct, takeProfitPct);
       } else if (type === ORDER_TYPES.MARKET_SELL) {
-        this.openPosition(playerId, SIDES.SHORT, sizePct, leverage, 'manual');
+        this.openPosition(playerId, SIDES.SHORT, sizePct, leverage, 'manual', amount, stopLossPct, takeProfitPct);
       } else if (type === ORDER_TYPES.CLOSE) {
         this.closePosition(playerId, positionId, 'manual');
       } else if (type === ORDER_TYPES.BANK_BORROW) {

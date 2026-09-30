@@ -229,3 +229,43 @@ test('Trading Engine: Replay Determinism and Cumulative Score Recording', () => 
   assert.equal(run1.length, run2.length);
   assert.deepEqual(run1, run2, 'Both simulation runs must be bit-for-bit identical');
 });
+
+test('Trading Engine: Take Profit and Stop Loss auto-execution', () => {
+  const p1 = createInitialPlayer('p_tp', 'TPTrader', 10000);
+  const p2 = createInitialPlayer('p_sl', 'SLTrader', 10000);
+  const engine = new TradingEngine({ startingBalance: 10000 });
+  engine.addPlayer(p1);
+  engine.addPlayer(p2);
+
+  // Candles: starting at 50,000, then pump to 55,000 (+10%), then dump to 45,000 (-10%)
+  const mockCandles = [
+    { open: 50000, high: 50000, low: 50000, close: 50000, volume: 1 },
+    { open: 50000, high: 56000, low: 49000, close: 55000, volume: 1 },
+    { open: 55000, high: 55000, low: 44000, close: 45000, volume: 1 }
+  ];
+
+  engine.initRound(0, mockCandles, 3);
+
+  // Player 1 buys LONG 1x with TP 8% (at 50,000 -> +10% pump should hit TP)
+  // Player 2 buys LONG 1x with SL 5% (at 55,000 -> dump to 45,000 should hit SL)
+  engine.stepTick([
+    { playerId: 'p_tp', type: ORDER_TYPES.MARKET_BUY, sizePct: 20, leverage: 1, amount: 2000, takeProfitPct: 8 },
+    { playerId: 'p_sl', type: ORDER_TYPES.MARKET_BUY, sizePct: 20, leverage: 1, amount: 2000, stopLossPct: 5 }
+  ]);
+
+  const p1Pos = engine.players.get('p_tp').positions[0];
+  assert.equal(p1Pos.takeProfitPct, 8);
+  const p2Pos = engine.players.get('p_sl').positions[0];
+  assert.equal(p2Pos.stopLossPct, 5);
+
+  // Step 2: Price pumps to 55,000 (+10% gain). Player 1's position (+10% > 8%) should hit Take Profit and auto-close!
+  engine.stepTick([]);
+  assert.equal(engine.players.get('p_tp').positions.length, 0, 'P1 position should auto-close via Take Profit');
+  assert.ok(engine.players.get('p_tp').balance > 10100, 'P1 should have locked in profit');
+
+  // Step 3: Price dumps to 45,000. Player 2's position was still open, now it is in loss and hits Stop Loss (-5%)!
+  engine.stepTick([]);
+  assert.equal(engine.players.get('p_sl').positions.length, 0, 'P2 position should auto-close via Stop Loss');
+  assert.ok(engine.players.get('p_sl').balance < 10000, 'P2 took limited loss from SL');
+});
+
