@@ -82,6 +82,8 @@ export default function Lobby({
     });
   };
 
+  const [activeTab, setActiveTab] = useState(initialRoomCode ? 'join' : 'create');
+
   // HOME SCREEN (Before entering or creating a room)
   if (!inRoom) {
     return (
@@ -100,138 +102,195 @@ export default function Lobby({
               letterSpacing: '0.08em',
               color: 'var(--accent)'
             }}>
-              Multiplayer Trading Simulation
+              Multiplayer Trading Arena
             </span>
             <h1 style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', marginTop: '4px', marginBottom: '6px' }}>
               INTRADAY TRADING ARENA
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Compete in accelerated historical markets. Pure server-authoritative trading.
+              Real-time server-authoritative trading match.
             </p>
           </div>
 
-          {/* If user clicked an invite link with ?room=CODE */}
-          {initialRoomCode && (
-            <div style={{
-              backgroundColor: 'var(--accent-subtle)',
-              border: '1px solid var(--accent)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 14px',
-              marginBottom: '16px',
-              fontSize: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
+          {/* First option: CREATE vs JOIN toggle */}
+          <div style={{
+            display: 'flex',
+            backgroundColor: 'var(--bg-surface-elevated)',
+            padding: '4px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--border-hairline)',
+            marginBottom: '20px'
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('create')}
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'create' ? 'var(--accent)' : 'transparent',
+                color: activeTab === 'create' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeTab === 'create' ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              ➕ CREATE ROOM
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('join')}
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'join' ? 'var(--accent)' : 'transparent',
+                color: activeTab === 'join' ? '#ffffff' : 'var(--text-secondary)',
+                boxShadow: activeTab === 'join' ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              🔗 JOIN ROOM
+            </button>
+          </div>
+
+          {activeTab === 'create' ? (
+            <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <span style={{ color: 'var(--text-secondary)' }}>Invited to room: </span>
-                <strong style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{initialRoomCode}</strong>
-              </div>
-              <button
-                type="button"
-                onClick={() => setJoinRoomInput('')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
+                <label style={{
+                  display: 'block',
                   fontSize: '11px',
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-              >
-                Change
-              </button>
-            </div>
-          )}
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '6px'
+                }}>
+                  Your Trader Nickname
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="e.g. Satoshi"
+                  maxLength={16}
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  className="input-base"
+                  style={{ width: '100%', fontSize: '14px', padding: '10px 12px' }}
+                />
+              </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-                color: 'var(--text-secondary)',
-                marginBottom: '6px'
-              }}>
-                Your Trader Nickname
-              </label>
-              <input
-                type="text"
-                autoFocus
-                placeholder="e.g. Satoshi"
-                maxLength={16}
-                value={nicknameInput}
-                onChange={(e) => setNicknameInput(e.target.value)}
-                className="input-base"
-                style={{ width: '100%', fontSize: '14px', padding: '10px 12px' }}
-              />
-            </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                You will be the Host. A private arena code will be generated to invite your friends.
+              </div>
 
-            {/* Direct Join button if invite room code is present */}
-            {initialRoomCode ? (
               <button
-                type="button"
-                onClick={handleJoinExistingSubmit}
+                type="submit"
                 disabled={!nicknameInput.trim()}
                 className="btn-base btn-primary"
                 style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
               >
-                JOIN ROOM {initialRoomCode}
+                CREATE ARENA ROOM
               </button>
-            ) : (
-              <>
-                {/* Create Room Action */}
-                <button
-                  type="button"
-                  onClick={handleCreateSubmit}
-                  disabled={!nicknameInput.trim()}
-                  className="btn-base btn-primary"
-                  style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
-                >
-                  CREATE NEW ROOM
-                </button>
-
+            </form>
+          ) : (
+            <form onSubmit={handleJoinExistingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {initialRoomCode && (
                 <div style={{
+                  backgroundColor: 'var(--accent-subtle)',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  fontSize: '12px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  margin: '6px 0',
-                  color: 'var(--text-muted)',
-                  fontSize: '11px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em'
+                  justifyContent: 'space-between'
                 }}>
-                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-hairline)' }} />
-                  <span>or join existing</span>
-                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-hairline)' }} />
-                </div>
-
-                {/* Join Existing Room */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Room Code (e.g. BULL-82)"
-                    maxLength={16}
-                    value={joinRoomInput}
-                    onChange={(e) => setJoinRoomInput(e.target.value.toUpperCase())}
-                    className="input-base"
-                    style={{ flex: 1, fontSize: '13px', padding: '9px 12px', textTransform: 'uppercase' }}
-                  />
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Invited to: </span>
+                    <strong style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{initialRoomCode}</strong>
+                  </div>
                   <button
                     type="button"
-                    onClick={handleJoinExistingSubmit}
-                    disabled={!nicknameInput.trim()}
-                    className="btn-base btn-outline"
-                    style={{ padding: '9px 16px', fontWeight: 600, fontSize: '13px' }}
+                    onClick={() => setJoinRoomInput('')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
                   >
-                    JOIN
+                    Clear
                   </button>
                 </div>
-              </>
-            )}
-          </div>
+              )}
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '6px'
+                }}>
+                  Your Trader Nickname
+                </label>
+                <input
+                  type="text"
+                  autoFocus={!initialRoomCode}
+                  placeholder="e.g. Satoshi"
+                  maxLength={16}
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  className="input-base"
+                  style={{ width: '100%', fontSize: '14px', padding: '10px 12px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  color: 'var(--text-secondary)',
+                  marginBottom: '6px'
+                }}>
+                  Room Code
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. BULL-42"
+                  maxLength={16}
+                  value={joinRoomInput}
+                  onChange={(e) => setJoinRoomInput(e.target.value.toUpperCase())}
+                  className="input-base"
+                  style={{ width: '100%', fontSize: '14px', padding: '10px 12px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!nicknameInput.trim() || !joinRoomInput.trim()}
+                className="btn-base btn-primary"
+                style={{ width: '100%', padding: '12px', fontSize: '14px', fontWeight: 700, borderRadius: 'var(--radius-md)' }}
+              >
+                JOIN ARENA ROOM
+              </button>
+            </form>
+          )}
         </div>
       </div>
     );

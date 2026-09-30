@@ -15,21 +15,12 @@ export default function App() {
   const [myNickname, setMyNickname] = useState(() => localStorage.getItem('arena_nick') || '');
   const [myPlayerId, setMyPlayerId] = useState(null);
 
-  // Multi-room lifecycle & session tracking
+  // Multi-room lifecycle: Always start on starting page on fresh load/refresh
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const initialRoomParam = (urlParams.get('room') || '').trim().toUpperCase();
-  const savedActiveRoom = typeof window !== 'undefined' ? (sessionStorage.getItem('arena_active_room') || '') : '';
-  const isResumingSession = Boolean(savedActiveRoom && initialRoomParam && savedActiveRoom === initialRoomParam);
 
-  const [inRoom, setInRoom] = useState(isResumingSession);
-  const [roomCode, setRoomCode] = useState(isResumingSession ? savedActiveRoom : initialRoomParam);
-
-  useEffect(() => {
-    // If visiting clean home screen (no ?room= in URL), clear any stale active room session
-    if (!initialRoomParam) {
-      sessionStorage.removeItem('arena_active_room');
-    }
-  }, [initialRoomParam]);
+  const [inRoom, setInRoom] = useState(false);
+  const [roomCode, setRoomCode] = useState(initialRoomParam || '');
 
   const [game, setGame] = useState({
     state: 'LOBBY',
@@ -84,12 +75,7 @@ export default function App() {
 
       ws.onopen = () => {
         setConnected(true);
-        // Only auto-join if actively in a room session in this tab
-        const activeRoom = sessionStorage.getItem('arena_active_room');
-        const savedNick = localStorage.getItem('arena_nick');
-        if (activeRoom && savedNick) {
-          ws.send(JSON.stringify({ type: 'JOIN', nickname: savedNick, roomCode: activeRoom }));
-        }
+        // Do not auto-join on load or refresh; always start on starting page
       };
 
       ws.onmessage = (event) => {
@@ -103,7 +89,6 @@ export default function App() {
               setMyNickname(msg.nickname);
               if (msg.roomCode) {
                 setRoomCode(msg.roomCode);
-                sessionStorage.setItem('arena_active_room', msg.roomCode);
                 const currentUrl = new URL(window.location.href);
                 if (currentUrl.searchParams.get('room') !== msg.roomCode) {
                   currentUrl.searchParams.set('room', msg.roomCode);
@@ -113,12 +98,39 @@ export default function App() {
               localStorage.setItem('arena_nick', msg.nickname);
               break;
 
+            case 'ROOM_CLOSED':
+              setInRoom(false);
+              setRoomCode('');
+              setMyPlayerId(null);
+              setGame(prev => ({
+                ...prev,
+                state: 'LOBBY',
+                players: [],
+                roundSummary: null,
+                revealedDate: null
+              }));
+              setFinalResults(null);
+              window.history.replaceState(null, '', window.location.pathname);
+              addToast('WARNING', msg.message || 'Host left or refreshed. The room has been deleted.');
+              break;
+
+            case 'ROOM_NOT_FOUND':
+              addToast('ERROR', msg.message || 'Room not found.');
+              break;
+
             case 'LEFT_ROOM':
               setInRoom(false);
               setRoomCode('');
               setMyPlayerId(null);
-              sessionStorage.removeItem('arena_active_room');
-              window.history.pushState(null, '', window.location.pathname);
+              setGame(prev => ({
+                ...prev,
+                state: 'LOBBY',
+                players: [],
+                roundSummary: null,
+                revealedDate: null
+              }));
+              setFinalResults(null);
+              window.history.replaceState(null, '', window.location.pathname);
               break;
 
             case 'GAME_STATE':
@@ -348,7 +360,7 @@ export default function App() {
 
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick, roomCode: cleanCode }));
+      ws.send(JSON.stringify({ type: 'CREATE_ROOM', nickname: cleanNick, roomCode: cleanCode }));
     }
   };
 
@@ -358,20 +370,15 @@ export default function App() {
     if (!cleanNick || !cleanCode) return;
     setMyNickname(cleanNick);
     localStorage.setItem('arena_nick', cleanNick);
-    sessionStorage.setItem('arena_active_room', cleanCode);
     setRoomCode(cleanCode);
-
-    const newUrl = `${window.location.pathname}?room=${cleanCode}`;
-    window.history.replaceState(null, '', newUrl);
 
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'JOIN', nickname: cleanNick, roomCode: cleanCode }));
+      ws.send(JSON.stringify({ type: 'JOIN_ROOM', nickname: cleanNick, roomCode: cleanCode }));
     }
   };
 
   const handleLeaveRoom = () => {
-    sessionStorage.removeItem('arena_active_room');
     setInRoom(false);
     setRoomCode('');
     setMyPlayerId(null);
@@ -387,7 +394,7 @@ export default function App() {
       betweenRoundCountdown: 0
     });
     setFinalResults(null);
-    window.history.pushState(null, '', window.location.pathname);
+    window.history.replaceState(null, '', window.location.pathname);
 
     const ws = socketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {

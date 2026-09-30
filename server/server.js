@@ -125,6 +125,13 @@ function isAuthorizedHost(boundPlayerId, game) {
   return false;
 }
 
+function generateRoomCode() {
+  const words = ['BULL', 'BEAR', 'MOON', 'APEX', 'NOVA', 'PUMP', 'WAVE', 'SWAP'];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num = Math.floor(10 + Math.random() * 90);
+  return `${word}-${num}`;
+}
+
 wss.on('connection', (ws) => {
   let boundRoomCode = null;
   let boundPlayerId = null;
@@ -133,19 +140,25 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message.toString());
 
-      if (data.type === 'JOIN') {
-        const rawCode = data.roomCode || 'ARENA-BTC';
-        const roomCode = rawCode.trim().toUpperCase().slice(0, 16);
+      if (data.type === 'CREATE_ROOM') {
+        const rawCode = data.roomCode || generateRoomCode();
+        let roomCode = rawCode.trim().toUpperCase().slice(0, 16);
+        while (roomManager.rooms.has(roomCode)) {
+          roomCode = generateRoomCode();
+        }
         const nickname = (data.nickname || 'Trader_' + Math.floor(Math.random() * 1000)).trim().slice(0, 16);
         const socketId = 'sock_' + Math.random().toString(36).substring(2, 9);
 
-        // If previously bound to another room on this socket, leave it cleanly first
-        if (boundRoomCode && boundPlayerId && boundRoomCode !== roomCode) {
+        // Leave any previous room on this socket
+        if (boundRoomCode && boundPlayerId) {
           const prevRoom = roomManager.getRoom(boundRoomCode);
           if (prevRoom) {
-            prevRoom.handlePlayerDisconnect(boundPlayerId);
-            if (prevRoom.getActiveSocketCount() === 0) {
+            if (prevRoom.hostPlayerId === boundPlayerId) {
+              prevRoom.broadcast({ type: 'ROOM_CLOSED', roomCode: boundRoomCode, message: 'Host left the room. Room closed.' });
               roomManager.deleteRoom(boundRoomCode);
+            } else {
+              prevRoom.handlePlayerDisconnect(boundPlayerId);
+              if (prevRoom.getActiveSocketCount() === 0) roomManager.deleteRoom(boundRoomCode);
             }
           }
         }
@@ -153,12 +166,61 @@ wss.on('connection', (ws) => {
         const game = roomManager.getOrCreateRoom(roomCode);
         boundRoomCode = roomCode;
         boundPlayerId = game.addOrReconnectPlayer(socketId, nickname, ws);
+        game.hostPlayerId = boundPlayerId; // Creator is ALWAYS host
 
         ws.send(JSON.stringify({
           type: 'JOINED',
           playerId: boundPlayerId,
           nickname,
-          roomCode
+          roomCode,
+          isHost: true
+        }));
+        return;
+      }
+
+      if (data.type === 'JOIN_ROOM' || data.type === 'JOIN') {
+        const rawCode = data.roomCode || 'ARENA-BTC';
+        const roomCode = rawCode.trim().toUpperCase().slice(0, 16);
+        const nickname = (data.nickname || 'Trader_' + Math.floor(Math.random() * 1000)).trim().slice(0, 16);
+        const socketId = 'sock_' + Math.random().toString(36).substring(2, 9);
+
+        let game = roomManager.getRoom(roomCode);
+        if (!game) {
+          if (roomCode === 'ARENA-BTC') {
+            game = roomManager.getOrCreateRoom(roomCode);
+          } else {
+            ws.send(JSON.stringify({
+              type: 'ROOM_NOT_FOUND',
+              roomCode,
+              message: `Room "${roomCode}" was not found or has been closed by the host.`
+            }));
+            return;
+          }
+        }
+
+        // Leave any previous room on this socket
+        if (boundRoomCode && boundPlayerId && boundRoomCode !== roomCode) {
+          const prevRoom = roomManager.getRoom(boundRoomCode);
+          if (prevRoom) {
+            if (prevRoom.hostPlayerId === boundPlayerId) {
+              prevRoom.broadcast({ type: 'ROOM_CLOSED', roomCode: boundRoomCode, message: 'Host left the room. Room closed.' });
+              roomManager.deleteRoom(boundRoomCode);
+            } else {
+              prevRoom.handlePlayerDisconnect(boundPlayerId);
+              if (prevRoom.getActiveSocketCount() === 0) roomManager.deleteRoom(boundRoomCode);
+            }
+          }
+        }
+
+        boundRoomCode = roomCode;
+        boundPlayerId = game.addOrReconnectPlayer(socketId, nickname, ws);
+
+        ws.send(JSON.stringify({
+          type: 'JOINED',
+          playerId: boundPlayerId,
+          nickname,
+          roomCode,
+          isHost: boundPlayerId === game.hostPlayerId
         }));
         return;
       }
@@ -167,9 +229,19 @@ wss.on('connection', (ws) => {
         if (boundRoomCode && boundPlayerId) {
           const game = roomManager.getRoom(boundRoomCode);
           if (game) {
-            game.removePlayer(boundPlayerId);
-            if (game.getActiveSocketCount() === 0) {
+            if (game.hostPlayerId === boundPlayerId) {
+              console.log(`[Host Left] Host ${boundPlayerId} left room ${boundRoomCode}. Deleting room.`);
+              game.broadcast({
+                type: 'ROOM_CLOSED',
+                roomCode: boundRoomCode,
+                message: 'Host closed the room. Returning to main menu...'
+              });
               roomManager.deleteRoom(boundRoomCode);
+            } else {
+              game.removePlayer(boundPlayerId);
+              if (game.getActiveSocketCount() === 0) {
+                roomManager.deleteRoom(boundRoomCode);
+              }
             }
           }
           ws.send(JSON.stringify({ type: 'LEFT_ROOM' }));
@@ -335,9 +407,19 @@ wss.on('connection', (ws) => {
     if (boundRoomCode && boundPlayerId) {
       const game = roomManager.getRoom(boundRoomCode);
       if (game) {
-        game.handlePlayerDisconnect(boundPlayerId);
-        if (game.getActiveSocketCount() === 0) {
+        if (game.hostPlayerId === boundPlayerId) {
+          console.log(`[Host Disconnected] Host ${boundPlayerId} disconnected/refreshed in room ${boundRoomCode}. Deleting room and kicking all players.`);
+          game.broadcast({
+            type: 'ROOM_CLOSED',
+            roomCode: boundRoomCode,
+            message: 'Host left or refreshed. The room has been deleted.'
+          });
           roomManager.deleteRoom(boundRoomCode);
+        } else {
+          game.handlePlayerDisconnect(boundPlayerId);
+          if (game.getActiveSocketCount() === 0) {
+            roomManager.deleteRoom(boundRoomCode);
+          }
         }
       }
       boundRoomCode = null;
