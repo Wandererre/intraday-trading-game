@@ -46,24 +46,53 @@ export default function FinalResultsModal({
     colorMap[r.nickname] = PLAYER_COLORS[idx % PLAYER_COLORS.length];
   });
 
-  let minEquity = Infinity;
-  let maxEquity = -Infinity;
+  let rawMin = Infinity;
+  let rawMax = -Infinity;
   let maxGameTime = 0;
 
   for (const [nickname, history] of Object.entries(allHistories)) {
     for (const pt of history) {
-      if (pt.equity < minEquity) minEquity = pt.equity;
-      if (pt.equity > maxEquity) maxEquity = pt.equity;
+      if (typeof pt.equity === 'number' && !isNaN(pt.equity)) {
+        if (pt.equity < rawMin) rawMin = pt.equity;
+        if (pt.equity > rawMax) rawMax = pt.equity;
+      }
       if (pt.gameTimeSec > maxGameTime) maxGameTime = pt.gameTimeSec;
     }
   }
 
-  if (minEquity === Infinity) minEquity = 0;
-  if (maxEquity === -Infinity) maxEquity = 15000;
+  if (rawMin === Infinity) rawMin = 10000;
+  if (rawMax === -Infinity) rawMax = 10000;
   if (maxGameTime === 0) maxGameTime = 300;
 
-  minEquity = Math.max(0, Math.floor(minEquity * 0.9));
-  maxEquity = Math.ceil(maxEquity * 1.1);
+  // Always encompass the $10,000 baseline in chart scale
+  const spreadMin = Math.min(rawMin, 10000);
+  const spreadMax = Math.max(rawMax, 10000);
+  const spread = spreadMax - spreadMin;
+
+  // Dynamic vertical scaling so small profits ($1 - $10) are visually prominent and distinct
+  let padding;
+  if (spread <= 1) {
+    padding = 2; // Flat or near-flat: $4 total span
+  } else if (spread < 20) {
+    padding = Math.max(1.5, spread * 0.25); // e.g. spread = 4 -> padding = 1.5 -> span = 7
+  } else if (spread < 100) {
+    padding = Math.max(5, spread * 0.2);
+  } else if (spread < 1000) {
+    padding = Math.max(20, spread * 0.15);
+  } else {
+    padding = Math.max(50, spread * 0.1);
+  }
+
+  const minEquity = Math.max(0, spreadMin - padding);
+  const maxEquity = spreadMax + padding;
+  const equitySpan = Math.max(1, maxEquity - minEquity);
+
+  const formatDeltaVal = (val) => {
+    const abs = Math.abs(val);
+    if (equitySpan < 15) return abs.toFixed(2);
+    if (equitySpan < 50) return abs.toFixed(1);
+    return Math.round(abs).toLocaleString();
+  };
 
   useEffect(() => {
     let startTime = null;
@@ -125,7 +154,9 @@ export default function FinalResultsModal({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, logicalW, logicalH);
 
-    ctx.fillStyle = '#090b0e';
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+
+    ctx.fillStyle = isLight ? '#ffffff' : '#090b0e';
     ctx.fillRect(0, 0, logicalW, logicalH);
 
     const padLeft = 70;
@@ -136,9 +167,9 @@ export default function FinalResultsModal({
     const plotH = logicalH - padTop - padBottom;
 
     const scaleX = (timeSec) => padLeft + (timeSec / maxGameTime) * plotW;
-    const scaleY = (eq) => padTop + plotH - ((eq - minEquity) / (maxEquity - minEquity)) * plotH;
+    const scaleY = (eq) => padTop + plotH - ((eq - minEquity) / equitySpan) * plotH;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.06)';
     ctx.lineWidth = 1;
     ctx.font = '10px -apple-system, sans-serif';
     ctx.textAlign = 'right';
@@ -146,7 +177,7 @@ export default function FinalResultsModal({
     // Draw baseline at $10,000
     if (10000 >= minEquity && 10000 <= maxEquity) {
       const y10k = scaleY(10000);
-      ctx.strokeStyle = 'rgba(78, 201, 176, 0.4)';
+      ctx.strokeStyle = isLight ? 'rgba(13, 148, 136, 0.6)' : 'rgba(78, 201, 176, 0.4)';
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -155,18 +186,18 @@ export default function FinalResultsModal({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#4EC9B0';
+      ctx.fillStyle = isLight ? '#0d9488' : '#4EC9B0';
       ctx.fillText('Δ $0 (10k)', padLeft - 8, y10k + 3);
     }
 
     const ySteps = 5;
     for (let i = 0; i <= ySteps; i++) {
-      const eqVal = minEquity + (i / ySteps) * (maxEquity - minEquity);
+      const eqVal = minEquity + (i / ySteps) * equitySpan;
       const delta = eqVal - 10000;
-      if (Math.abs(delta) < (maxEquity - minEquity) / 20) continue; // skip if close to 10k line
+      if (Math.abs(delta) < equitySpan / 20) continue; // skip if close to 10k line
 
       const y = scaleY(eqVal);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.strokeStyle = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(padLeft, y);
@@ -174,9 +205,11 @@ export default function FinalResultsModal({
       ctx.stroke();
 
       const isPos = delta > 0;
-      ctx.fillStyle = isPos ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)';
+      ctx.fillStyle = isPos
+        ? (isLight ? '#059669' : 'rgba(16, 185, 129, 0.85)')
+        : (isLight ? '#dc2626' : 'rgba(239, 68, 68, 0.85)');
       const sign = isPos ? '+' : '-';
-      ctx.fillText(`${sign}$${Math.abs(Math.round(delta)).toLocaleString()}`, padLeft - 8, y + 4);
+      ctx.fillText(`${sign}$${formatDeltaVal(delta)}`, padLeft - 8, y + 4);
     }
 
     let accumulatedTime = 0;
@@ -184,7 +217,7 @@ export default function FinalResultsModal({
       accumulatedTime += dur;
       if (accumulatedTime <= maxGameTime) {
         const x = scaleX(accumulatedTime);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.strokeStyle = isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)';
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(x, padTop);
@@ -192,7 +225,7 @@ export default function FinalResultsModal({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = isLight ? '#475569' : '#94a3b8';
         ctx.font = '10px -apple-system, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`Round ${rIdx + 1} (${dur}s)`, x, logicalH - padBottom + 18);
@@ -268,7 +301,8 @@ export default function FinalResultsModal({
             ctx.textAlign = 'left';
             const endDelta = lastPt.equity - 10000;
             const sign = endDelta >= 0 ? '+' : '-';
-            ctx.fillText(`${nickname} (Δ ${sign}$${Math.abs(Math.round(endDelta)).toLocaleString()})`, hx + 8, hy + 3);
+            ctx.fillStyle = isLight ? '#0f172a' : '#ffffff';
+            ctx.fillText(`${nickname} (Δ ${sign}$${formatDeltaVal(endDelta)})`, hx + 8, hy + 3);
           }
         }
       }
@@ -278,7 +312,7 @@ export default function FinalResultsModal({
 
     if (hoverData && hoverData.timeSec <= maxGameTime) {
       const hx = scaleX(hoverData.timeSec);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.strokeStyle = isLight ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.4)';
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
       ctx.moveTo(hx, padTop);
@@ -336,6 +370,8 @@ export default function FinalResultsModal({
     a.click();
   };
 
+  const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+
   return (
     <div style={{
       position: 'fixed',
@@ -343,7 +379,8 @@ export default function FinalResultsModal({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(9, 11, 14, 0.96)',
+      backgroundColor: isLight ? 'rgba(248, 250, 252, 0.98)' : 'rgba(9, 11, 14, 0.96)',
+      color: 'var(--text-primary)',
       backdropFilter: 'blur(8px)',
       overflowY: 'auto',
       zIndex: 100,
@@ -455,7 +492,7 @@ export default function FinalResultsModal({
                     fontSize: '11px',
                     padding: '3px 8px',
                     backgroundColor: selectedTrader === r.nickname ? 'rgba(255,255,255,0.14)' : 'transparent',
-                    color: selectedTrader === r.nickname ? '#ffffff' : colorMap[r.nickname] || 'var(--text-secondary)',
+                    color: selectedTrader === r.nickname ? 'var(--text-primary)' : colorMap[r.nickname] || 'var(--text-secondary)',
                     border: `1px solid ${selectedTrader === r.nickname ? colorMap[r.nickname] : 'var(--border-hairline)'}`,
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -489,8 +526,9 @@ export default function FinalResultsModal({
                 position: 'absolute',
                 top: '40px',
                 right: '28px',
-                backgroundColor: 'rgba(18, 21, 27, 0.95)',
+                backgroundColor: isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(18, 21, 27, 0.95)',
                 border: '1px solid var(--border-hairline)',
+                boxShadow: isLight ? '0 4px 14px rgba(0,0,0,0.12)' : '0 4px 14px rgba(0,0,0,0.5)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '8px 12px',
                 fontSize: '11px',
@@ -506,9 +544,9 @@ export default function FinalResultsModal({
                     <div key={nick} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '1px 0' }}>
                       <span style={{ color: colorMap[nick] || 'var(--text-primary)' }}>{nick}</span>
                       <span className="tabular-nums" style={{ fontWeight: 600, color: isProfit ? 'var(--color-long)' : 'var(--color-short)' }}>
-                        {isProfit ? '+' : ''}${Math.round(delta).toLocaleString()}
+                        {isProfit ? '+' : '-'}${formatDeltaVal(delta)}
                         <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginLeft: '4px' }}>
-                          (${Math.round(val).toLocaleString()})
+                          (${equitySpan < 50 ? val.toFixed(2) : Math.round(val).toLocaleString()})
                         </span>
                       </span>
                     </div>
@@ -572,7 +610,7 @@ export default function FinalResultsModal({
                         fontSize: '14px',
                         color: isNetProfit ? 'var(--color-long)' : 'var(--color-short)'
                       }}>
-                        {isNetProfit ? '+' : ''}${netDelta.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        {isNetProfit ? '+' : ''}${Math.abs(netDelta) < 50 && !Number.isInteger(netDelta) ? netDelta.toFixed(2) : Math.round(netDelta).toLocaleString('en-US')}
                       </div>
                       <div className="tabular-nums" style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                         Total: ${r.balance?.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}

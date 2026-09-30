@@ -1,42 +1,4 @@
 :root,
-:root[data-theme="dark"] {
-  --bg-page: #090b0e;
-  --bg-surface: #12151b;
-  --bg-surface-elevated: #181d25;
-  --bg-surface-hover: #1f2530;
-  --bg-surface-active: #272f3d;
-
-  --border-hairline: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.14);
-  --border-focus: rgba(255, 255, 255, 0.28);
-
-  --text-primary: #f3f4f6;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-active: #1d4ed8;
-  --accent-subtle: rgba(59, 130, 246, 0.12);
-  --accent-text: #ffffff;
-
-  --color-long: #10b981;
-  --color-long-hover: #059669;
-  --color-long-bg: rgba(16, 185, 129, 0.12);
-  --color-long-border: rgba(16, 185, 129, 0.28);
-  --color-long-text: #34d399;
-
-  --color-short: #ef4444;
-  --color-short-hover: #dc2626;
-  --color-short-bg: rgba(239, 68, 68, 0.12);
-  --color-short-border: rgba(239, 68, 68, 0.28);
-  --color-short-text: #f87171;
-
-  --chart-bg: #12151b;
-  --chart-grid: rgba(255, 255, 255, 0.04);
-  --chart-text: #94a3b8;
-}
-
 :root[data-theme="light"] {
   --bg-page: #f8fafc;
   --bg-surface: #ffffff;
@@ -73,6 +35,44 @@
   --chart-bg: #ffffff;
   --chart-grid: rgba(0, 0, 0, 0.04);
   --chart-text: #64748b;
+}
+
+:root[data-theme="dark"] {
+  --bg-page: #090b0e;
+  --bg-surface: #12151b;
+  --bg-surface-elevated: #181d25;
+  --bg-surface-hover: #1f2530;
+  --bg-surface-active: #272f3d;
+
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.14);
+  --border-focus: rgba(255, 255, 255, 0.28);
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-active: #1d4ed8;
+  --accent-subtle: rgba(59, 130, 246, 0.12);
+  --accent-text: #ffffff;
+
+  --color-long: #10b981;
+  --color-long-hover: #059669;
+  --color-long-bg: rgba(16, 185, 129, 0.12);
+  --color-long-border: rgba(16, 185, 129, 0.28);
+  --color-long-text: #34d399;
+
+  --color-short: #ef4444;
+  --color-short-hover: #dc2626;
+  --color-short-bg: rgba(239, 68, 68, 0.12);
+  --color-short-border: rgba(239, 68, 68, 0.28);
+  --color-short-text: #f87171;
+
+  --chart-bg: #12151b;
+  --chart-grid: rgba(255, 255, 255, 0.04);
+  --chart-text: #94a3b8;
 }
 
 :root {

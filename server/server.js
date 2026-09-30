@@ -74,6 +74,23 @@ function broadcastToAll(data) {
 
 const game = new GameManager(broadcastToAll);
 
+function isAuthorizedHost(boundPlayerId, game) {
+  if (!boundPlayerId) return false;
+  if (game.hostPlayerId && game.hostPlayerId === boundPlayerId) return true;
+  const hostSocket = game.hostPlayerId ? game.clientSockets.get(game.hostPlayerId) : null;
+  const isHostConnected = hostSocket && hostSocket.readyState === 1;
+  if (!game.hostPlayerId || !game.players.has(game.hostPlayerId) || !isHostConnected) {
+    game.hostPlayerId = boundPlayerId;
+    return true;
+  }
+  const firstPlayer = game.players.values().next().value;
+  if (firstPlayer && firstPlayer.id === boundPlayerId) {
+    game.hostPlayerId = boundPlayerId;
+    return true;
+  }
+  return false;
+}
+
 wss.on('connection', (ws) => {
   let boundPlayerId = null;
 
@@ -95,35 +112,35 @@ wss.on('connection', (ws) => {
         }
 
         case 'HOST_CONFIG': {
-          if (boundPlayerId && boundPlayerId === game.hostPlayerId) {
+          if (isAuthorizedHost(boundPlayerId, game)) {
             game.updateConfig(data.config);
           }
           break;
         }
 
         case 'HOST_START_GAME': {
-          if (boundPlayerId && boundPlayerId === game.hostPlayerId) {
+          if (isAuthorizedHost(boundPlayerId, game)) {
             game.startGame();
           }
           break;
         }
 
         case 'HOST_NEXT_ROUND': {
-          if (boundPlayerId && boundPlayerId === game.hostPlayerId) {
+          if (isAuthorizedHost(boundPlayerId, game)) {
             game.forceNextRound();
           }
           break;
         }
 
         case 'HOST_RESTART_GAME': {
-          if (boundPlayerId && boundPlayerId === game.hostPlayerId) {
+          if (isAuthorizedHost(boundPlayerId, game)) {
             game.restartGame();
           }
           break;
         }
 
         case 'HOST_END_GAME': {
-          if (boundPlayerId && boundPlayerId === game.hostPlayerId) {
+          if (isAuthorizedHost(boundPlayerId, game)) {
             game.endGame();
           }
           break;

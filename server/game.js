@@ -73,9 +73,10 @@ export class GameManager {
       const player = createInitialPlayer(playerId, cleanNick, this.config.startingBalance);
       this.players.set(playerId, player);
       this.engine.addPlayer(player);
-      if (!this.hostPlayerId) {
-        this.hostPlayerId = playerId;
-      }
+    }
+
+    if (!this.hostPlayerId || !this.players.has(this.hostPlayerId)) {
+      this.hostPlayerId = playerId;
     }
 
     this.clientSockets.set(playerId, ws);
@@ -88,7 +89,10 @@ export class GameManager {
   }
 
   startGame() {
-    if (this.state !== GAME_STATES.LOBBY) return false;
+    if (this.state !== GAME_STATES.LOBBY) {
+      this.broadcastState();
+      return false;
+    }
     if (this.players.size === 0) return false;
 
     this.currentRoundIndex = 0;

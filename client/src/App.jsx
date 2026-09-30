@@ -10,7 +10,7 @@ import FinalResultsModal from './components/FinalResultsModal';
 import Toast from './components/Toast';
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('arena_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('arena_theme') || 'light');
   const [connected, setConnected] = useState(false);
   const [myNickname, setMyNickname] = useState(() => localStorage.getItem('arena_nick') || '');
   const [myPlayerId, setMyPlayerId] = useState(null);
@@ -93,6 +93,12 @@ export default function App() {
               break;
 
             case 'ROUND_STARTED':
+              setGame(prev => ({
+                ...prev,
+                state: 'ROUND_ACTIVE',
+                currentRoundIndex: msg.roundIndex !== undefined ? msg.roundIndex : prev.currentRoundIndex,
+                totalRounds: msg.totalRounds || prev.totalRounds
+              }));
               setTickData(prev => ({
                 ...prev,
                 currentPrice: msg.initialPrice,
@@ -109,6 +115,16 @@ export default function App() {
               break;
 
             case 'TICK':
+              setGame(prev => {
+                if (prev.state === 'LOBBY') {
+                  return {
+                    ...prev,
+                    state: 'ROUND_ACTIVE',
+                    currentRoundIndex: msg.roundIndex !== undefined ? msg.roundIndex : prev.currentRoundIndex
+                  };
+                }
+                return prev;
+              });
               setTickData(prev => {
                 const high = Math.max(prev.high, msg.price);
                 const low = Math.min(prev.low, msg.price);

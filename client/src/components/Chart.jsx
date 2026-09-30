@@ -4,7 +4,7 @@ import { createChart, ColorType, LineStyle } from 'lightweight-charts';
 export default function Chart({
   candles = [],
   currentCandle,
-  theme = 'dark',
+  theme = 'light',
   positions = [],
   playerPosition,
   roundIndex = 0
