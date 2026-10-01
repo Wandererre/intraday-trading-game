@@ -240,10 +240,6 @@ export default function App() {
               }
               break;
 
-            case 'MARKET_EVENT':
-              addToast('WARNING', `${msg.name}: ${msg.message}`);
-              break;
-
             case 'ROUND_FINISHED':
               setGame(prev => ({
                 ...prev,

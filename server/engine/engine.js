@@ -1,24 +1,13 @@
 import { SIDES, ORDER_TYPES } from './types.js';
 import { evaluateCondition } from './rules.js';
 import { evaluateStrategy } from './strategy-interpreter.js';
-import { createPRNG } from '../data-loader.js';
 
 export class TradingEngine {
   constructor(options = {}) {
-    this.feeRate = options.feeRate ?? 0.0005; // 0.05% default, GameManager configures 0.001 (0.1%)
+    this.feeRate = options.feeRate ?? 0.0005; // 0.05%
     this.maxLeverage = options.maxLeverage ?? 20;
     this.startingBalance = options.startingBalance ?? 10000;
     this.equityRecordInterval = options.equityRecordInterval ?? 1;
-    this.enableSlippage = options.enableSlippage ?? false;
-    this.enableExecutionDelay = options.enableExecutionDelay ?? false;
-    this.enablePlayerImpact = options.enablePlayerImpact ?? false;
-    this.volatilityMultiplier = options.volatilityMultiplier ?? 1.0;
-    this.randomEvents = options.randomEvents ?? [];
-    this.roundSeed = options.roundSeed ?? 'default_seed';
-    this.prng = createPRNG(this.roundSeed);
-    this.pendingOrders = [];
-    this.cumulativePlayerImpactPct = 0;
-    this.cumulativeEventImpactPct = 0;
     this.players = new Map();
     this.priceHistory = [];
     this.feed = [];
@@ -78,35 +67,12 @@ export class TradingEngine {
     return pObj;
   }
 
-  initRound(roundIndex, candles, totalRoundTicks, options = {}) {
+  initRound(roundIndex, candles, totalRoundTicks) {
     this.roundIndex = roundIndex;
     this.candles = candles;
     this.totalRoundTicks = totalRoundTicks;
     this.currentTick = 0;
     this.priceHistory = [];
-    this.pendingOrders = [];
-    this.cumulativePlayerImpactPct = 0;
-    this.cumulativeEventImpactPct = 0;
-
-    if (options.roundSeed !== undefined) {
-      this.roundSeed = options.roundSeed;
-      this.prng = createPRNG(this.roundSeed);
-    }
-    if (options.volatilityMultiplier !== undefined) {
-      this.volatilityMultiplier = options.volatilityMultiplier;
-    }
-    if (options.randomEvents !== undefined) {
-      this.randomEvents = options.randomEvents;
-    }
-    if (options.enableSlippage !== undefined) {
-      this.enableSlippage = options.enableSlippage;
-    }
-    if (options.enableExecutionDelay !== undefined) {
-      this.enableExecutionDelay = options.enableExecutionDelay;
-    }
-    if (options.enablePlayerImpact !== undefined) {
-      this.enablePlayerImpact = options.enablePlayerImpact;
-    }
 
     // Fresh set of money each round for every player
     for (const player of this.players.values()) {
@@ -126,64 +92,6 @@ export class TradingEngine {
       this.priceHistory.push(candles[0].open || candles[0].close);
       this.recordEquitySnapshot('round_start');
     }
-  }
-
-  calculateSlippage(side, notional, basePrice, isClosing = false) {
-    if (!this.enableSlippage || basePrice <= 0) return basePrice;
-    // Slippage grows with order size (notional) and round volatility
-    const baseSlippageRate = 0.0002; // 0.02% base slippage
-    const sizeImpact = (notional / 50000) * 0.0005;
-    const volImpact = (this.volatilityMultiplier || 1.0) * 0.0003;
-    const jitter = this.prng ? (this.prng() * 0.0002) : 0.0001;
-    const totalSlippageRate = Math.min(0.015, Math.max(0.0001, baseSlippageRate + sizeImpact + volImpact + jitter));
-
-    let multiplier;
-    if (!isClosing) {
-      multiplier = (side === SIDES.LONG) ? (1 + totalSlippageRate) : (1 - totalSlippageRate);
-    } else {
-      multiplier = (side === SIDES.LONG) ? (1 - totalSlippageRate) : (1 + totalSlippageRate);
-    }
-    return Math.round(basePrice * multiplier * 100) / 100;
-  }
-
-  calculatePlayerImpactDelta(currentPrice) {
-    if (!this.enablePlayerImpact || !this.players || this.players.size === 0 || currentPrice <= 0) return 0;
-
-    let longExposure = 0;
-    let shortExposure = 0;
-
-    for (const player of this.players.values()) {
-      if (player.isLiquidated || !player.positions) continue;
-      for (const pos of player.positions) {
-        const notional = (pos.margin || 0) * (pos.leverage || 1);
-        if (pos.side === SIDES.LONG) {
-          longExposure += notional;
-        } else if (pos.side === SIDES.SHORT) {
-          shortExposure += notional;
-        }
-      }
-    }
-
-    const netExposure = longExposure - shortExposure;
-    if (Math.abs(netExposure) < 100) return 0;
-
-    // Scale by total leverage-weighted position size
-    // Crowd punishment: if net long, price pushed downward; if net short, price pushed upward.
-    const normalizedExposure = netExposure / 200000;
-    const tickNudgePct = Math.min(0.0001, Math.abs(normalizedExposure) * 0.00005);
-    let deltaPct = (netExposure > 0 ? -1 : 1) * tickNudgePct;
-
-    // Strict cumulative cap at fraction of a percent (<= 0.3% / 0.003)
-    const MAX_CUMULATIVE_IMPACT = 0.003;
-    const prospective = this.cumulativePlayerImpactPct + deltaPct;
-    if (prospective > MAX_CUMULATIVE_IMPACT) {
-      deltaPct = Math.max(0, MAX_CUMULATIVE_IMPACT - this.cumulativePlayerImpactPct);
-    } else if (prospective < -MAX_CUMULATIVE_IMPACT) {
-      deltaPct = Math.min(0, -MAX_CUMULATIVE_IMPACT - this.cumulativePlayerImpactPct);
-    }
-
-    this.cumulativePlayerImpactPct += deltaPct;
-    return currentPrice * deltaPct;
   }
 
   getCurrentPrice() {
@@ -324,48 +232,17 @@ export class TradingEngine {
     }
   }
 
-  openPosition(playerId, side, sizePct, leverage, source = 'manual', amount = null, stopLossPct = null, takeProfitPct = null, allowDelay = true) {
+  openPosition(playerId, side, sizePct, leverage, source = 'manual', amount = null, stopLossPct = null, takeProfitPct = null) {
     const player = this.players.get(playerId);
     if (!player || player.isLiquidated) return null;
+
+    const currentPrice = this.getCurrentPrice();
+    if (currentPrice <= 0) return null;
 
     player.positions = player.positions || [];
     if (player.positions.length >= 8) {
       return null; // Max 8 concurrent positions
     }
-
-    // Delay each order's fill by a random 0 to 2 ticks (for manual, rule, and bot trades)
-    if (allowDelay && this.enableExecutionDelay) {
-      const delayTicks = Math.floor(this.prng() * 3); // 0, 1, or 2
-      if (delayTicks > 0) {
-        const pendingOrder = {
-          id: `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          type: 'OPEN',
-          playerId,
-          side,
-          sizePct,
-          leverage,
-          source,
-          amount,
-          stopLossPct,
-          takeProfitPct,
-          targetPriceAtClick: this.getCurrentPrice(),
-          requestedAtTick: this.currentTick,
-          executeAtTick: this.currentTick + delayTicks,
-          delayTicks
-        };
-        this.pendingOrders.push(pendingOrder);
-        return {
-          pending: true,
-          id: pendingOrder.id,
-          delayTicks,
-          targetPriceAtClick: pendingOrder.targetPriceAtClick,
-          executeAtTick: pendingOrder.executeAtTick
-        };
-      }
-    }
-
-    const currentPrice = this.getCurrentPrice();
-    if (currentPrice <= 0) return null;
 
     const lev = Math.min(this.maxLeverage, Math.max(1, leverage || 1));
     const pct = Math.min(100, Math.max(1, sizePct || 10));
@@ -400,22 +277,20 @@ export class TradingEngine {
     if (targetMargin < 5) return null;
 
     const actualMargin = targetMargin;
-    // Apply execution slippage
-    const effectivePrice = this.calculateSlippage(side, notional, currentPrice, false);
-    const size = notional / effectivePrice;
+    const size = notional / currentPrice;
 
     player.balance = Math.max(0, player.balance - actualMargin - fee);
     if (player.balance < 0.01) player.balance = 0;
 
     const liqPrice = side === SIDES.LONG
-      ? effectivePrice * (1 - (1 / lev))
-      : effectivePrice * (1 + (1 / lev));
+      ? currentPrice * (1 - (1 / lev))
+      : currentPrice * (1 + (1 / lev));
 
     const newPosition = {
       id: `pos_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       side,
       size,
-      entryPrice: effectivePrice,
+      entryPrice: currentPrice,
       leverage: lev,
       margin: actualMargin,
       liquidationPrice: Math.round(liqPrice * 100) / 100,
@@ -439,7 +314,7 @@ export class TradingEngine {
       side,
       sizePct: pct,
       leverage: lev,
-      price: effectivePrice,
+      price: currentPrice,
       margin: Math.round(actualMargin),
       source,
       isBot: source === 'rule' || source === 'bot',
@@ -604,41 +479,14 @@ export class TradingEngine {
     return newPosition;
   }
 
-  closePosition(playerId, positionId = null, source = 'manual', allowDelay = true) {
+  closePosition(playerId, positionId = null, source = 'manual') {
     const player = this.players.get(playerId);
     if (!player || !player.positions || player.positions.length === 0) return null;
 
     // Handle backwards compatibility if called as closePosition(playerId, 'manual')
-    if (typeof positionId === 'string' && ['manual', 'rule', 'bot', 'stop_loss', 'take_profit', 'round_end', 'liquidation'].includes(positionId)) {
+    if (typeof positionId === 'string' && ['manual', 'rule', 'stop_loss', 'take_profit'].includes(positionId)) {
       source = positionId;
       positionId = null;
-    }
-
-    // Delay each order's fill by a random 0 to 2 ticks (for manual, rule, and bot trades)
-    // Automated triggers like stop_loss, take_profit, liquidation, round_end pass allowDelay = false
-    if (allowDelay && this.enableExecutionDelay && source !== 'stop_loss' && source !== 'take_profit' && source !== 'liquidation' && source !== 'round_end') {
-      const delayTicks = Math.floor(this.prng() * 3); // 0, 1, or 2
-      if (delayTicks > 0) {
-        const pendingOrder = {
-          id: `ord_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          type: 'CLOSE',
-          playerId,
-          positionId,
-          source,
-          targetPriceAtClick: this.getCurrentPrice(),
-          requestedAtTick: this.currentTick,
-          executeAtTick: this.currentTick + delayTicks,
-          delayTicks
-        };
-        this.pendingOrders.push(pendingOrder);
-        return {
-          pending: true,
-          id: pendingOrder.id,
-          delayTicks,
-          targetPriceAtClick: pendingOrder.targetPriceAtClick,
-          executeAtTick: pendingOrder.executeAtTick
-        };
-      }
     }
 
     // Find specific position or close the oldest/most recent
@@ -653,10 +501,8 @@ export class TradingEngine {
 
     const pos = player.positions[targetIndex];
     const currentPrice = this.getCurrentPrice();
-    // Apply execution slippage on close
-    const effectivePrice = this.calculateSlippage(pos.side, pos.size * currentPrice, currentPrice, true);
-    const uPnL = this.calculatePositionPnL(pos, effectivePrice);
-    const exitFee = pos.size * effectivePrice * this.feeRate;
+    const uPnL = this.calculatePositionPnL(pos, currentPrice);
+    const exitFee = pos.size * currentPrice * this.feeRate;
 
     const returnedCash = Math.max(0, pos.margin + uPnL - exitFee);
     player.balance = Math.round((player.balance + returnedCash) * 100) / 100;
@@ -687,7 +533,7 @@ export class TradingEngine {
       side: pos.side,
       leverage: pos.leverage,
       entryPrice: pos.entryPrice,
-      exitPrice: effectivePrice,
+      exitPrice: currentPrice,
       pnl: Math.round(uPnL * 100) / 100,
       pnlPct: Math.round(pnlPct * 10) / 10,
       source,
@@ -704,12 +550,12 @@ export class TradingEngine {
     return event;
   }
 
-  closeAllPositions(playerId, source = 'manual', allowDelay = false) {
+  closeAllPositions(playerId, source = 'manual') {
     const player = this.players.get(playerId);
     if (!player || !player.positions || player.positions.length === 0) return [];
     const closedEvents = [];
     while (player.positions.length > 0) {
-      const ev = this.closePosition(playerId, player.positions[0].id, source, allowDelay);
+      const ev = this.closePosition(playerId, player.positions[0].id, source);
       if (ev) closedEvents.push(ev);
     }
     return closedEvents;
@@ -789,99 +635,8 @@ export class TradingEngine {
     }
 
     const candle = this.candles[this.currentTick];
-    let currentPrice = candle.close;
-
-    // 0a. Check and apply active market events
-    let marketEvent = null;
-    if (this.randomEvents && this.randomEvents.length > 0) {
-      for (const evt of this.randomEvents) {
-        if (this.currentTick >= evt.startTick && this.currentTick < (evt.startTick + evt.duration)) {
-          if (this.currentTick === evt.startTick) {
-            marketEvent = {
-              name: evt.name,
-              message: evt.message,
-              type: evt.type
-            };
-            this.feed.unshift({
-              id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-              type: 'MARKET_EVENT',
-              name: evt.name,
-              message: evt.message,
-              tick: this.currentTick
-            });
-            if (this.feed.length > 50) this.feed.pop();
-          }
-
-          // Compute per-tick delta
-          let tickNudgePct = 0;
-          if (evt.direction !== 0) {
-            tickNudgePct = (evt.direction * evt.magnitude) / evt.duration;
-          } else {
-            // Volatility storm whipsaw
-            const offset = this.currentTick - evt.startTick;
-            tickNudgePct = ((offset % 2 === 0 ? 1 : -1) * evt.magnitude) / evt.duration * 1.5;
-          }
-
-          // Enforce 6% cumulative round cap on event magnitude
-          if (this.cumulativeEventImpactPct + Math.abs(tickNudgePct) <= 0.06) {
-            this.cumulativeEventImpactPct += Math.abs(tickNudgePct);
-            currentPrice += candle.close * tickNudgePct;
-          }
-        }
-      }
-    }
-
-    // 0b. Player impact (crowd punishment)
-    const playerNudge = this.calculatePlayerImpactDelta(currentPrice);
-    currentPrice += playerNudge;
-    currentPrice = Math.round(currentPrice * 100) / 100;
-
-    const effectiveCandle = {
-      ...candle,
-      high: Math.max(candle.high, currentPrice),
-      low: Math.min(candle.low, currentPrice),
-      close: currentPrice
-    };
-
+    const currentPrice = candle.close;
     this.priceHistory.push(currentPrice);
-
-    // 0c. Process pending delayed orders ready to execute on this tick
-    if (this.pendingOrders && this.pendingOrders.length > 0) {
-      const readyOrders = [];
-      const remainingOrders = [];
-      for (const ord of this.pendingOrders) {
-        if (ord.executeAtTick <= this.currentTick) {
-          readyOrders.push(ord);
-        } else {
-          remainingOrders.push(ord);
-        }
-      }
-      this.pendingOrders = remainingOrders;
-
-      for (const ord of readyOrders) {
-        if (ord.type === 'OPEN') {
-          this.openPosition(
-            ord.playerId,
-            ord.side,
-            ord.sizePct,
-            ord.leverage,
-            ord.source,
-            ord.amount,
-            ord.stopLossPct,
-            ord.takeProfitPct,
-            false // allowDelay = false (execute now!)
-          );
-        } else if (ord.type === 'CLOSE') {
-          this.closePosition(
-            ord.playerId,
-            ord.positionId,
-            ord.source,
-            false // allowDelay = false (execute now!)
-          );
-        }
-      }
-    }
-
     this.currentTick += 1;
     this.gameTimeSec += 1;
 
@@ -931,14 +686,14 @@ export class TradingEngine {
         if (pos.stopLossPct) {
           const pnlPct = (uPnL / pos.margin) * 100;
           if (pnlPct <= -Math.abs(pos.stopLossPct)) {
-            this.closePosition(player.id, pos.id, 'stop_loss', false);
+            this.closePosition(player.id, pos.id, 'stop_loss');
             continue;
           }
         }
         if (pos.takeProfitPct) {
           const pnlPct = (uPnL / pos.margin) * 100;
           if (pnlPct >= Math.abs(pos.takeProfitPct)) {
-            this.closePosition(player.id, pos.id, 'take_profit', false);
+            this.closePosition(player.id, pos.id, 'take_profit');
             continue;
           }
         }
@@ -1149,20 +904,18 @@ export class TradingEngine {
       tickIndex: this.currentTick,
       totalTicks: this.totalRoundTicks,
       timeLeftSec,
-      candle: effectiveCandle,
+      candle,
       currentPrice,
       leaderboard,
-      feed: this.feed.slice(0, 15),
-      marketEvent
+      feed: this.feed.slice(0, 15)
     };
   }
 
   endRound() {
-    this.pendingOrders = [];
     // Close all open positions at final price and settle bank debt
     for (const player of this.players.values()) {
       if (player.positions && player.positions.length > 0) {
-        this.closeAllPositions(player.id, 'round_end', false);
+        this.closeAllPositions(player.id, 'round_end');
       }
       if ((player.bankDebt || 0) > 0) {
         player.balance = Math.max(0, player.balance - player.bankDebt);

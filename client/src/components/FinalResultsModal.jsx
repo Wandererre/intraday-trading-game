@@ -838,11 +838,6 @@ export default function FinalResultsModal({
               <h1 style={{ fontSize: '24px', fontWeight: 600, letterSpacing: '-0.02em', marginTop: '2px' }}>
                 Championship Standings
               </h1>
-              {revealedDate && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', fontFamily: 'monospace' }}>
-                  Market Reveal: <strong style={{ color: 'var(--text-primary)' }}>{revealedDate}</strong>
-                </div>
-              )}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
