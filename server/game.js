@@ -23,7 +23,7 @@ export class GameManager {
       numberOfRounds: 3,     // 1 to 5 rounds
       startingBalance: 10000,
       maxLeverage: 20,
-      feeRate: 0.0005,
+      feeRate: 0.001,        // 0.1% base fee
       seed: '',
       candleDurationSec: 15, // 10s to 30s per candle (default 15s)
       tickIntervalMs: 1000   // 1000ms (1 second) per sub-tick for smooth live candle development
@@ -38,7 +38,10 @@ export class GameManager {
     this.engine = new TradingEngine({
       feeRate: this.config.feeRate,
       maxLeverage: this.config.maxLeverage,
-      startingBalance: this.config.startingBalance
+      startingBalance: this.config.startingBalance,
+      enableSlippage: true,
+      enableExecutionDelay: true,
+      enablePlayerImpact: true
     });
 
     this.roundSegment = null;
@@ -205,8 +208,21 @@ export class GameManager {
       }
     }
 
-    // Initialize round with fresh $10,000 for everyone
-    this.engine.initRound(roundIndex, this.roundSegment.ticks, this.roundSegment.ticks.length);
+    // Initialize round with unpredictability parameters
+    const roundSeed = this.config.seed ? `${this.config.seed}_round_${roundIndex}` : `rnd_${Date.now()}_round_${roundIndex}`;
+    this.engine.initRound(
+      roundIndex,
+      this.roundSegment.ticks,
+      this.roundSegment.ticks.length,
+      {
+        roundSeed,
+        volatilityMultiplier: this.roundSegment.volatilityMultiplier,
+        randomEvents: this.roundSegment.randomEvents,
+        enableSlippage: true,
+        enableExecutionDelay: true,
+        enablePlayerImpact: true
+      }
+    );
     this.state = GAME_STATES.ROUND_ACTIVE;
     this.queuedIntents = [];
 
@@ -224,10 +240,11 @@ export class GameManager {
 
     this.broadcastState();
 
-    // Start accelerated sub-tick clock
+    // Start accelerated sub-tick clock using round segment's dynamic speed
+    const tickInterval = this.roundSegment.tickIntervalMs || this.config.tickIntervalMs || 1000;
     this.tickTimer = setInterval(() => {
       this.stepGameTick();
-    }, this.config.tickIntervalMs);
+    }, tickInterval);
   }
 
   stepGameTick() {
@@ -242,6 +259,16 @@ export class GameManager {
       if (!stepResult) {
         this.endCurrentRound();
         return;
+      }
+
+      // Broadcast market event toast when one starts
+      if (stepResult.marketEvent) {
+        this.broadcast({
+          type: 'MARKET_EVENT',
+          name: stepResult.marketEvent.name,
+          message: stepResult.marketEvent.message,
+          roundIndex: this.currentRoundIndex
+        });
       }
 
       // Broadcast tick packet
@@ -288,6 +315,7 @@ export class GameManager {
         type: 'GAME_OVER',
         roundSummary: this.roundSummary,
         revealedDate: this.roundSegment.dateLabel,
+        marketReveal: this.roundSegment.marketReveal,
         allHistories,
         allStats,
         roundDurations: Array(this.config.numberOfRounds).fill(this.config.roundDurationSec)
@@ -302,6 +330,7 @@ export class GameManager {
         roundIndex: this.currentRoundIndex,
         roundSummary: this.roundSummary,
         revealedDate: this.roundSegment.dateLabel,
+        marketReveal: this.roundSegment.marketReveal,
         countdown: this.betweenRoundCountdown
       });
       this.broadcastState();
@@ -347,7 +376,10 @@ export class GameManager {
     this.engine = new TradingEngine({
       feeRate: this.config.feeRate,
       maxLeverage: this.config.maxLeverage,
-      startingBalance: this.config.startingBalance
+      startingBalance: this.config.startingBalance,
+      enableSlippage: true,
+      enableExecutionDelay: true,
+      enablePlayerImpact: true
     });
 
     // Prune any disconnected players before restarting
